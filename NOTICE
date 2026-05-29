@@ -1,0 +1,37 @@
+OpenWhoop
+Copyright (c) 2026 Johnathan Middleton
+Licensed under the MIT License (see LICENSE).
+
+This is an independent project for interoperability with the user's own WHOOP 4.0
+device data. It is not affiliated with, endorsed by, or sponsored by WHOOP, Inc.
+"WHOOP" is a trademark of its respective owner, used here only descriptively.
+
+------------------------------------------------------------------------------
+No third-party source code is bundled in this repository.
+------------------------------------------------------------------------------
+
+The reverse-engineering scripts under `re/` reference third-party projects at
+runtime (e.g. `jogolden/whoomp`) that are intentionally NOT included here; clone
+them separately. See `re/README.md` and `.gitignore`.
+
+Prior community reverse-engineering of the WHOOP BLE protocol informed the
+protocol *facts* (frame layout, CRC, command/event identifiers) documented in
+`protocol/whoop_protocol.json` and `FINDINGS.md`. No code from these projects was
+copied. With thanks to their authors:
+  - jogolden/whoomp
+  - christianmeurer/whoop-reader
+  - bWanShiTong/reverse-engineering-whoop
+
+The derived-metric modules under `server/ingest/app/analysis/` are independent
+implementations of published methods, not derived from any third-party codebase:
+  - HRV ........... Task Force of ESC/NASPE (1996); neurokit2
+  - Sleep ......... Cole & Kripke (1992); te Lindert & Van Someren (2013); Walch et al. (2019)
+  - Strain ........ Karvonen (1957); Edwards (1993); Banister (1991); Tanaka et al. (2001)
+  - Energy ........ Keytel et al. (2005); Harris-Benedict / Roza & Shock (1984)
+
+------------------------------------------------------------------------------
+Third-party runtime dependencies (declared, not vendored; each under its own
+license): GRDB.swift (MIT); FastAPI, uvicorn, numpy, scipy, scikit-learn,
+pandas, httpx, zstandard (BSD); neurokit2 (MIT); psycopg (LGPL-3.0, used as an
+unmodified runtime library); bleak (MIT). Fonts are loaded from Google Fonts
+(SIL OFL / Apache-2.0), not vendored.
