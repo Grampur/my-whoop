@@ -177,6 +177,8 @@ public final class BLEManager: NSObject, ObservableObject {
     }
 
     public func disconnect() {
+        // Stop the live HR stream before dropping the connection.
+        send(.toggleRealtimeHR, payload: [0x00])
         intentionalDisconnect = true
         if let p = peripheral {
             central.cancelPeripheralConnection(p)
@@ -749,6 +751,14 @@ extension BLEManager: CBPeripheralDelegate {
         // SEND_HISTORICAL runs on a settled link, like the paced Mac prototype. beginBackfill is itself
         // gated on connectHandshakeDone so a racing foreground/restore trigger can't fire it early.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.requestSync(.connect) }
+        // Start the type-40 REALTIME_DATA stream (HR + R-R intervals) for live collection.
+        // Deferred 2s — after the backfill handshake settles — so it doesn't compete with
+        // SEND_HISTORICAL on the BLE link. extractStreams reads type-40 exclusively for live HR
+        // (type-43 raw flood is stopped above; 0x2A37 standard HR is display-only, not stored).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.send(.toggleRealtimeHR, payload: [0x01])
+            self?.log("Live HR stream started (TOGGLE_REALTIME_HR=1)")
+        }
         uploadOpportunistically()
         // NOTE: the server pull + cloud-restore are deliberately NOT kicked here. They share the
         // WhoopStore actor with the historical offload, and a large first-run pull would starve the
