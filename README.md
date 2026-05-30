@@ -10,7 +10,7 @@ and shared by the phone and the server so they never drift.
 > is used here only descriptively, to identify the hardware this software interoperates with.
 > The project is the result of independent reverse-engineering for interoperability and is
 > provided **for personal and educational use** with **your own device and your own data**, at
-> your own risk. No warranty — see [`LICENSE`](LICENSE).
+> your own risk. No warranty of any kind.
 >
 > **Not a medical device.** Heart rate, HRV, recovery, strain, sleep, SpO₂, and related
 > outputs are approximations from published methods, are **not** clinically validated, and are
@@ -68,5 +68,6 @@ reverse-engineering and from these projects — thanks to their authors:
 
 ## License
 
-[MIT](LICENSE) © 2026 Johnathan Middleton. See [`NOTICE`](NOTICE) for attributions and the
-provenance of the protocol facts and analysis methods.
+No license is granted at this time — all rights reserved. This repository is published for
+reference and personal use. If you'd like to reuse the code, open an issue. See [`NOTICE`](NOTICE)
+for attributions and the provenance of the protocol facts and analysis methods.
