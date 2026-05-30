@@ -651,8 +651,8 @@ function drawChart(cv, pts, color, opts={}){
   if(validPts.length===0){ x.fillStyle='#3f5450'; x.font='11px "IBM Plex Mono"';
     x.fillText('no data in window', padL+10, padT+H/2); return; }
   const ts=validPts.map(p=>p.t), vs=validPts.map(p=>p.v);
-  let mn = opts.fixedMin!=null?opts.fixedMin:Math.min(...vs);
-  let mx = opts.fixedMax!=null?opts.fixedMax:Math.max(...vs);
+  let mn = opts.fixedMin!=null?opts.fixedMin:vs.reduce((a,b)=>a<b?a:b, vs[0]);
+  let mx = opts.fixedMax!=null?opts.fixedMax:vs.reduce((a,b)=>a>b?a:b, vs[0]);
   if(mn===mx){ mn-=1; mx+=1; }
   // x-domain: a SHARED [tMin,tMax] (opts) makes all stream charts line up on one time axis so
   // they're directly comparable (a stream that doesn't cover the whole span shows gaps at the
@@ -682,7 +682,7 @@ function drawChart(cv, pts, color, opts={}){
   x.beginPath();
   validPts.forEach((p,i)=>{ const X=px(p.t),Y=py(p.v);
     (i && (p.t - validPts[i-1].t) <= gap) ? x.lineTo(X,Y) : x.moveTo(X,Y); });
-  x.strokeStyle=color; x.lineWidth=1.6; x.shadowColor=color; x.shadowBlur=7; x.stroke(); x.shadowBlur=0;
+  x.strokeStyle=color; x.lineWidth=1.6; x.stroke();
   // last-point dot
   const last=validPts[validPts.length-1];
   x.fillStyle=color; x.beginPath(); x.arc(px(last.t),py(last.v),2.4,0,7); x.fill();
@@ -707,8 +707,8 @@ function drawMultiChart(cv, series, opts={}){
   if(allPts.length===0){ x.fillStyle='#3f5450'; x.font='11px "IBM Plex Mono"';
     x.fillText('no data in window', padL+10, padT+H/2); return; }
   const ts=allPts.map(p=>p.t), vs=allPts.map(p=>p.v);
-  let mn = opts.fixedMin!=null?opts.fixedMin:Math.min(...vs);
-  let mx = opts.fixedMax!=null?opts.fixedMax:Math.max(...vs);
+  let mn = opts.fixedMin!=null?opts.fixedMin:vs.reduce((a,b)=>a<b?a:b, vs[0]);
+  let mx = opts.fixedMax!=null?opts.fixedMax:vs.reduce((a,b)=>a>b?a:b, vs[0]);
   if(mn===mx){ mn-=1; mx+=1; }
   // Shared x-domain (opts.tMin/tMax) — see drawChart. Falls back to own extent when unset.
   const t0 = opts.tMin!=null?opts.tMin:Math.min(...ts);
@@ -730,7 +730,7 @@ function drawMultiChart(cv, series, opts={}){
     x.beginPath();
     sp.forEach((p,i)=>{ const X=px(p.t),Y=py(p.v);
       (i && (p.t - sp[i-1].t) <= gap) ? x.lineTo(X,Y) : x.moveTo(X,Y); });
-    x.strokeStyle=s.color; x.lineWidth=1.6; x.shadowColor=s.color; x.shadowBlur=7; x.stroke(); x.shadowBlur=0;
+    x.strokeStyle=s.color; x.lineWidth=1.6; x.stroke();
     const last=sp[sp.length-1];
     x.fillStyle=s.color; x.beginPath(); x.arc(px(last.t),py(last.v),2.4,0,7); x.fill();
   });
@@ -1023,4 +1023,9 @@ function fmtFull(iso){ return new Date(iso).toLocaleString('en',{year:'2-digit',
 // locale decide, but 'en' defaults to 12-hour with AM/PM.
 function fmtClock(t){ return new Date(t).toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'}); }
 function labelRange(s){ s=+s; if(s>=2592000)return '30d'; if(s>=604800)return '7d'; if(s>=86400)return '24h'; return s+'s'; }
-window.addEventListener('resize', ()=>{ if(state.device) loadAll(); });
+let _resizeRaf = null;
+window.addEventListener('resize', ()=>{
+  if(!state.device) return;
+  if(_resizeRaf) cancelAnimationFrame(_resizeRaf);
+  _resizeRaf = requestAnimationFrame(()=>{ _resizeRaf = null; loadAll(); });
+});
