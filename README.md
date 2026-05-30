@@ -59,15 +59,9 @@ reverse-engineering and from these projects — thanks to their authors:
 - [`bWanShiTong/openwhoop`](https://github.com/bWanShiTong/openwhoop) — Rust reference whose
   type-47 (V24/V12) biometric decode layout and sleep/wake stillness classifier informed the
   decoding here; the HRV and strain modules under `server/ingest/app/analysis/` were **ported**
-  from its `openwhoop-algos` and adapted (see `NOTICE`).
+  from its `openwhoop-algos` and adapted.
 - [`jogolden/whoomp`](https://github.com/jogolden/whoomp) — the authoritative
   firmware-extracted protocol reference (CRC, framing, packet types).
 - [`bWanShiTong/reverse-engineering-whoop`](https://github.com/bWanShiTong/reverse-engineering-whoop)
   and [`christianmeurer/whoop-reader`](https://github.com/christianmeurer/whoop-reader) —
   earlier BLE exploration.
-
-## License
-
-No license is granted at this time — all rights reserved. This repository is published for
-reference and personal use. If you'd like to reuse the code, open an issue. See [`NOTICE`](NOTICE)
-for attributions and the provenance of the protocol facts and analysis methods.
