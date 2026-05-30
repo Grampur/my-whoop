@@ -100,6 +100,7 @@ public final class BLEManager: NSObject, ObservableObject {
     let deviceId: String
     /// Captured (device↔wall) correlation from GET_CLOCK; nil until the response lands.
     private(set) var clockRef: ClockRef?
+    private var realtimeClockAnchored = false
 
     public init(state: LiveState, deviceId: String = "my-whoop") {
         self.state = state
@@ -601,6 +602,7 @@ extension BLEManager: CBCentralManagerDelegate {
         state.connected = false
         didBond = false
         clockRequested = false
+        realtimeClockAnchored = false
         connectHandshakeDone = false
         // Reset backfill state so the next connect starts a fresh offload.
         backfillStarted = false
@@ -648,6 +650,7 @@ extension BLEManager: CBCentralManagerDelegate {
         // seed those flags now. `didWriteValueFor` won't re-fire on its own.
         state.bonded = true
         didBond = true
+        realtimeClockAnchored = false
         // clockRef is nil in the fresh process after restore, so we must re-request it.
         // Reset the flag so the post-restore didWriteValueFor issues exactly one getClock.
         clockRequested = false
@@ -857,9 +860,19 @@ extension BLEManager: CBPeripheralDelegate {
                     }
                 } else {
                     // Live path (unchanged): synchronous ingest preserves delegate arrival order.
+                    if !realtimeClockAnchored, frame.count > 6, frame[4] == 40 {
+                        let parsed = parseFrame(frame)
+                        if let rawTs = parsed.parsed["timestamp"]?.intValue {
+                            let wall = Int(Date().timeIntervalSince1970)
+                            let ref = ClockRef(device: rawTs, wall: wall)
+                            clockRef = ref
+                            collector?.clockRef = ref
+                            realtimeClockAnchored = true
+                            log("Clock re-anchored from first type-40: device=\(rawTs) wall=\(wall)")
+                        }
+                    }
                     collector?.ingest(frame)
                 }
-            }
         default:
             break
         }
