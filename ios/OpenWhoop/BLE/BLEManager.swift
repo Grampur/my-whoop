@@ -139,6 +139,10 @@ public final class BLEManager: NSObject, ObservableObject {
                                     self?.ackHistoricalChunk(trim: trim, endData: endData)
                                 },
                                 enableRawCapture: enableRawCapture)
+        if let ref = clockRef {
+            collector?.clockRef = ref
+            backfiller?.clockRef = ref
+        }
         if let cfg = AppConfig.uploaderConfig(deviceId: deviceId) {
             uploader = Uploader(config: cfg, store: store, deviceId: deviceId)
             serverSync = ServerSync(config: cfg, store: store, deviceId: deviceId)
