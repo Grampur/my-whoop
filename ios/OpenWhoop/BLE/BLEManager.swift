@@ -94,13 +94,13 @@ public final class BLEManager: NSObject, ObservableObject {
     private var seq: UInt8 = 0
     private var didBond = false
     private var clockRequested = false
+    private var realtimeClockAnchored = false
     private var intentionalDisconnect = false
 
     /// Stable device id; matches the server's existing device for sync parity. Overridable.
     let deviceId: String
     /// Captured (device↔wall) correlation from GET_CLOCK; nil until the response lands.
     private(set) var clockRef: ClockRef?
-    private var realtimeClockAnchored = false
 
     public init(state: LiveState, deviceId: String = "my-whoop") {
         self.state = state
@@ -859,7 +859,10 @@ extension BLEManager: CBPeripheralDelegate {
                         routeBackfillFrame(frame)
                     }
                 } else {
-                    // Live path (unchanged): synchronous ingest preserves delegate arrival order.
+                    // Live path: re-anchor clockRef on the first type-40 frame so the monotonic
+                    // device epoch (NOT the RTC that GET_CLOCK/SET_CLOCK touches) is used as the
+                    // device_clock_ref. Without this, the identity ref (device=wall=now) produces
+                    // timestamps ~50 years in the past because type-40's epoch is ~31M s, not unix.
                     if !realtimeClockAnchored, frame.count > 6, frame[4] == 40 {
                         let parsed = parseFrame(frame)
                         if let rawTs = parsed.parsed["timestamp"]?.intValue {
@@ -873,6 +876,7 @@ extension BLEManager: CBPeripheralDelegate {
                     }
                     collector?.ingest(frame)
                 }
+            }
         default:
             break
         }
