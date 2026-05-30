@@ -460,7 +460,34 @@ final class ServerSync {
         return workouts.reversed()
     }
 
-    // MARK: - ts parsing
+    // MARK: - Strain Coach
+
+    struct StrainCoach {
+        let recovery: Double?
+        let targetStrain: Double?
+        let currentStrain: Double
+        let remaining: Double?
+        let pctUsed: Double?
+        let status: String
+    }
+
+    func getStrainCoach(date: String) async -> StrainCoach? {
+        let path = "/v1/strain-coach?device=\(deviceId)&date=\(date)"
+        guard let body = await get(path: path),
+            let r = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] else {
+            return nil
+        }
+        let dbl = ServerSync.dbl
+        return StrainCoach(
+            recovery: dbl(r, "recovery"),
+            targetStrain: dbl(r, "target_strain"),
+            currentStrain: dbl(r, "current_strain") ?? 0.0,
+            remaining: dbl(r, "remaining"),
+            pctUsed: dbl(r, "pct_used"),
+            status: r["status"] as? String ?? "unknown"
+        )
+    }
+        // MARK: - ts parsing
 
     private static let isoFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
