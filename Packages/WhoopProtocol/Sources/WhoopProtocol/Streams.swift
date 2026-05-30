@@ -120,7 +120,8 @@ extension Streams { public static let empty = Streams() }
 /// Assumes strap clock and wall clock tick at the same rate (no skew/drift). Port of _to_wall.
 private func toWall(_ deviceTs: Int?, _ deviceClockRef: Int, _ wallClockRef: Int) -> Int? {
     guard let deviceTs = deviceTs else { return nil }
-    return wallClockRef + (deviceTs - deviceClockRef)
+    let wall = wallClockRef + (deviceTs - deviceClockRef)
+    return wall > 1000000000 ? wall : nil
 }
 
 /// Turn parsed frames into datastore rows. Port of interpreter.extract_streams.
