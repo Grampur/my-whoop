@@ -363,7 +363,7 @@ public final class BLEManager: NSObject, ObservableObject {
         // per-chunk insert→ack and trip the 20s offload watchdog. Safe to run now: backfilling=false.
         restoreFromServerIfNeeded()  // once-per-launch: full history restore if the store is empty
         pullFromServer()             // incremental pull: new rows since read-highwater
-        if reason == "HISTORY_COMPLETE" {
+        if reason == "HISTORY_COMPLETE" || reason == "timeout" {
             state.lastSyncedAt = Date().timeIntervalSince1970
             UserDefaults.standard.set(state.lastSyncedAt, forKey: "lastSyncedAt")
         }
