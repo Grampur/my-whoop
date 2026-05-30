@@ -20,8 +20,8 @@ struct OpenWhoopApp: App {
 /// The MetricsRepository opens its on-disk store lazily (on the first load/refresh call),
 /// so there is no need to wait for an async factory before showing the UI.
 private struct AppRoot: View {
-    @StateObject private var metrics = MetricsRepository()
-    @StateObject private var live    = LiveViewModel()
+    @StateObject private var metrics = MetricsRepository(deviceId: AppConfig.deviceId)
+    @StateObject private var live    = LiveViewModel(deviceId: AppConfig.deviceId)
 
     var body: some View {
         RootTabView()

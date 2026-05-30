@@ -8,6 +8,15 @@ public struct UploaderConfig: Equatable {
 }
 
 enum AppConfig {
+    /// The device id this build reads/writes under. Read from the gitignored
+    /// Secrets.xcconfig (WHOOP_DEVICE_ID) so a personal build can point at its own
+    /// history without committing the real id; falls back to "my-whoop".
+    static var deviceId: String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "WHOOP_DEVICE_ID") as? String
+        if let v, !v.isEmpty, v != "$(WHOOP_DEVICE_ID)" { return v }
+        return "my-whoop"
+    }
+
     /// Returns nil when unconfigured (missing/placeholder), so the app simply doesn't upload.
     static func uploaderConfig(deviceId: String) -> UploaderConfig? {
         guard

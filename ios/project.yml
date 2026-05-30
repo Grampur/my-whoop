@@ -31,6 +31,7 @@ targets:
           - bluetooth-central
         WHOOP_BASE_URL: $(WHOOP_BASE_URL)
         WHOOP_API_KEY: $(WHOOP_API_KEY)
+        WHOOP_DEVICE_ID: $(WHOOP_DEVICE_ID)
     dependencies:
       - package: WhoopProtocol
       - package: WhoopStore

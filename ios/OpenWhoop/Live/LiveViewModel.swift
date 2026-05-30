@@ -13,10 +13,10 @@ public final class LiveViewModel: ObservableObject {
     /// One-line storage summary for the UI; refreshed periodically from LiveView.
     @Published public var storageSummary: String = "stored: —"
 
-    public init() {
+    public init(deviceId: String = "my-whoop") {
         let s = LiveState()
         self.state = s
-        self.ble = BLEManager(state: s)
+        self.ble = BLEManager(state: s, deviceId: deviceId)
         // Drive battery alerts off every reading (foreground or background, while the process lives).
         s.onBatteryUpdate = { [batteryAlerts] pct in batteryAlerts.handle(battery: pct) }
         // Request notification permission for all local notifications in one pass — sync nudge and
