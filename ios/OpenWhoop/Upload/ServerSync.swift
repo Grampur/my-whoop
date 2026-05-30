@@ -359,7 +359,10 @@ final class ServerSync {
                                disturbances: int(r, "disturbances"),
                                restingHr: int(r, "resting_hr") ?? int(r, "restingHr"),
                                avgHrv: dbl(r, "avg_hrv") ?? dbl(r, "avgHrv"),
-                               recovery: dbl(r, "recovery"),
+                               // Server emits recovery as a 0–100 score; the app's
+                               // DailyMetric.recovery contract is a 0–1 fraction (all
+                               // display sites do `recovery * 100`). Normalize here.
+                               recovery: dbl(r, "recovery").map { $0 / 100.0 },
                                strain: dbl(r, "strain"),
                                exerciseCount: int(r, "exercise_count") ?? int(r, "exerciseCount"),
                                spo2Pct: dbl(r, "spo2_pct") ?? dbl(r, "spo2Pct"),

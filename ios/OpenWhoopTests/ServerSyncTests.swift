@@ -178,9 +178,12 @@ final class ServerSyncTests: XCTestCase {
         fmt.calendar = cal; fmt.timeZone = TimeZone(identifier: "UTC"); fmt.dateFormat = "yyyy-MM-dd"
         let today = fmt.string(from: Date())
 
+        // NOTE: the server emits recovery as a 0–100 score (e.g. 66.0). The app's
+        // DailyMetric.recovery contract is a 0–1 fraction (every display site does
+        // `recovery * 100`), so getDaily must normalize on decode.
         let dailyBody = """
         [{"day":"\(today)","total_sleep_min":420.0,"efficiency":0.9,"deep_min":90,"rem_min":110,\
-        "light_min":220,"disturbances":3,"resting_hr":53,"avg_hrv":60.0,"recovery":0.66,\
+        "light_min":220,"disturbances":3,"resting_hr":53,"avg_hrv":60.0,"recovery":66.0,\
         "strain":12.3,"exercise_count":1}]
         """
         let sleepBody = """
@@ -204,6 +207,8 @@ final class ServerSyncTests: XCTestCase {
         XCTAssertEqual(days[0].totalSleepMin, 420.0)
         XCTAssertEqual(days[0].restingHr, 53)
         XCTAssertEqual(days[0].exerciseCount, 1)
+        // Server's 0–100 score must be normalized to the app's 0–1 contract.
+        XCTAssertEqual(try XCTUnwrap(days[0].recovery), 0.66, accuracy: 1e-6)
 
         // /v1/sleep is queried per-day over the window; the same body is returned each call, so the
         // single session (natural key startTs=epochA) is upserted once (dedup across days).
