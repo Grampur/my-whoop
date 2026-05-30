@@ -737,12 +737,23 @@ extension BLEManager: CBPeripheralDelegate {
         send(.getHelloHarvard)
         send(.getAdvertisingNameHarvard)
         send(.setClock, payload: BLEManager.setClockPayload())
-        if clockRef == nil && !clockRequested {
+        // SET_CLOCK just synced the strap RTC to current Unix time, so device ≈ wall ≈ now.
+        // Establish an identity clockRef immediately so the Collector can start persisting
+        // live frames without waiting for the GET_CLOCK round-trip (which may be slow or
+        // silent). If GET_CLOCK responds later, it will refine this ref in the handler below.
+        if clockRef == nil {
+            let now = Int(Date().timeIntervalSince1970)
+            let ref = ClockRef(device: now, wall: now)
+            clockRef = ref
+            collector?.clockRef = ref
+            backfiller?.clockRef = ref
+            log("Clock ref bootstrapped from SET_CLOCK: device=\(now) wall=\(now)")
+        }
+        if !clockRequested {
             clockRequested = true
             send(.getClock, payload: [])   // WHOOP sends GET_CLOCK with EMPTY payload (apk lh0/l.java);
                                            // the app's old default [0x00] is a wrong length the strap ignores.
-                                           // (Offload no longer depends on this — Backfiller falls back to an
-                                           // identity clockRef — but a real correlation helps realtime decode.)
+                                           // GET_CLOCK response will refine the clockRef if it arrives.
         }
         send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery)
         send(.getDataRange)                          // refresh the strap's stored range for the watchdog
