@@ -61,6 +61,12 @@ struct TodayView: View {
                     strainCard
                 }
                 .buttonStyle(.plain)
+                // Strain Coach card
+                strainCoachCard
+                    .task { await metrics.fetchStrainCoach(date: {
+                        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+                        return f.string(from: Date())
+                    }()) }
 
                 // Sleep card → sleep duration history
                 NavigationLink(destination: MetricDetailView(kind: .sleepDuration)) {
@@ -144,6 +150,45 @@ struct TodayView: View {
                           value: value,
                           unit: hasStrain ? "/ 21" : nil,
                           accentColor: hasStrain ? WH.Color.strainBlue : WH.Color.textSecondary)
+    }
+
+    // MARK: - Strain Coach card
+
+    private var strainCoachCard: some View {
+        let coach = metrics.strainCoach
+        let current = coach?.currentStrain ?? 0.0
+        let target = coach?.targetStrain
+        let remaining = coach?.remaining
+        let pct = coach?.pctUsed ?? 0.0
+
+        let accentColor: Color = {
+            guard pct > 0 else { return WH.Color.textSecondary }
+            if pct >= 100 { return WH.Color.recoveryRed }
+            if pct >= 80 { return WH.Color.recoveryYellow }
+            return WH.Color.recoveryGreen
+        }()
+
+        let valueStr = target != nil ? String(format: "%.1f / %.1f", current, target!) : "—"
+        let subtitle = remaining != nil ? String(format: "%.1f remaining", remaining!) : "Sleep to unlock"
+
+        return MetricCard(title: "Strain Coach", value: valueStr, unit: nil, accentColor: accentColor) {
+            VStack(alignment: .leading, spacing: WH.Spacing.xs) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(WH.Color.ringTrack)
+                            .frame(height: 6)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(accentColor)
+                            .frame(width: geo.size.width * min(pct / 100.0, 1.0), height: 6)
+                    }
+                }
+                .frame(height: 6)
+                Text(subtitle)
+                    .font(WH.Font.caption)
+                    .foregroundStyle(WH.Color.textSecondary)
+            }
+        }
     }
 
     // MARK: - Sleep card

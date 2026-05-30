@@ -347,6 +347,43 @@ def backfill_workouts(body: BackfillWorkouts):
     return {"recomputed": len(results), "days": results}
 
 
+# ── Strain Coach endpoint ─────────────────────────────────────────────────────
+
+def _recovery_to_target_strain(recovery: float) -> float:
+    """Map recovery score (0-100) to a recommended target strain (0-21)."""
+    if recovery >= 67:
+        return round(14.0 + (recovery - 67) / 33.0 * 4.0, 1)
+    elif recovery >= 34:
+        return round(10.0 + (recovery - 34) / 32.0 * 3.0, 1)
+    else:
+        return round(7.0 + recovery / 33.0 * 2.0, 1)
+
+
+@app.get("/v1/strain-coach", dependencies=[Depends(require_auth)])
+def get_strain_coach(device: str, date: str):
+    """Return strain coach data for a given date."""
+    today = _parse_date(date)
+    yesterday = today - _dt.timedelta(days=1)
+    with psycopg.connect(cfg.db_dsn) as conn:
+        yesterday_rows = read.query_daily(conn, device, yesterday, yesterday)
+        today_rows = read.query_daily(conn, device, today, today)
+    recovery = None
+    current_strain = 0.0
+    if yesterday_rows:
+        recovery = yesterday_rows[0].get("recovery")
+    if today_rows:
+        current_strain = float(today_rows[0].get("strain") or 0.0)
+    if recovery is None:
+        return {"date": date, "recovery": None, "target_strain": None,
+                "current_strain": current_strain, "remaining": None,
+                "pct_used": None, "status": "no_recovery"}
+    target = _recovery_to_target_strain(float(recovery))
+    remaining = round(max(0.0, target - current_strain), 1)
+    pct_used = round(min(100.0, current_strain / target * 100), 1) if target > 0 else 0.0
+    return {"date": date, "recovery": recovery, "target_strain": target,
+            "current_strain": current_strain, "remaining": remaining,
+            "pct_used": pct_used, "status": "ok"}
+
 @app.get("/v1/batches/{batch_id}/frames", dependencies=[Depends(require_auth)])
 def get_batch_frames(batch_id: str):
     with psycopg.connect(cfg.db_dsn) as conn:

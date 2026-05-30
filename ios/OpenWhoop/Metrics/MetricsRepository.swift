@@ -22,6 +22,7 @@ final class MetricsRepository: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
     @Published private(set) var lastRefreshedAt: Date?
+    @Published private(set) var strainCoach: ServerSync.StrainCoach?
 
     // Injected directly (test path): store + sync are ready immediately; skip ensureOpen.
     private var store: WhoopStore?
@@ -140,7 +141,9 @@ final class MetricsRepository: ObservableObject {
         await load()
         isRefreshing = false
         lastRefreshedAt = Date()
-
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let _ = await fetchStrainCoach(date: fmt.string(from: Date()))
         // Morning recovery notification: fire once per calendar day when recovery is available.
         if let metric = today, let recovery = metric.recovery {
             RecoveryNotifier.notify(recovery: recovery, forDay: metric.day)
@@ -259,6 +262,13 @@ final class MetricsRepository: ObservableObject {
     func workouts(from: String, to: String) async -> [Workout] {
         await ensureOpen()
         return await serverSync?.getWorkouts(from: from, to: to) ?? []
+    }
+
+    func fetchStrainCoach(date: String) async -> ServerSync.StrainCoach? {
+        await ensureOpen()
+        let result = await serverSync?.getStrainCoach(date: date)
+        strainCoach = result
+        return result
     }
 
     // MARK: - Workout calorie backfill (M7)
