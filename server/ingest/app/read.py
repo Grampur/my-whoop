@@ -227,7 +227,8 @@ def query_profile(conn, device_id: str) -> dict | None:
 _DAILY_COLS = ["device_id", "day", "total_sleep_min", "efficiency", "deep_min",
                "rem_min", "light_min", "disturbances", "resting_hr", "avg_hrv",
                "recovery", "strain", "exercise_count", "sleep_start", "sleep_end",
-               "spo2_pct", "skin_temp_dev_c", "resp_rate_bpm", "computed_at"]
+               "spo2_pct", "skin_temp_dev_c", "resp_rate_bpm",
+               "sleep_need_min", "sleep_debt_min", "computed_at"]
 
 
 def query_daily(conn, device_id, start_date, end_date):
