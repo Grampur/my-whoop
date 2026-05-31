@@ -369,7 +369,7 @@ final class ServerSync {
                                skinTempDevC: dbl(r, "skin_temp_dev_c") ?? dbl(r, "skinTempDevC"),
                                respRateBpm: dbl(r, "resp_rate_bpm") ?? dbl(r, "respRateBpm"),
                                sleepNeedMin: dbl(r, "sleep_need_min") ?? dbl(r, "sleepNeedMin"),
-                               sleepDebtMin: dbl(r, "sleep_debt_min") ?? dbl(r, "sleepDebtMin")),
+                               sleepDebtMin: dbl(r, "sleep_debt_min") ?? dbl(r, "sleepDebtMin"))
         }
     }
 
