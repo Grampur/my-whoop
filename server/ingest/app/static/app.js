@@ -238,7 +238,7 @@ function renderDaily(d, series, sleep) {
           </span>
           <span class="bio-item">
             <span class="bio-label">Skin Δ</span>
-            <span class="bio-val skin-dev">${fmtDev(skinDev)}</span>
+            <span class="bio-val skin-dev ${skinDev == null ? '' : Math.abs(skinDev) > 0.8 ? 'hot' : Math.abs(skinDev) > 0.3 ? 'warm' : 'cool'}">${fmtDev(skinDev)}</span>
             <span class="bio-unit">°C vs baseline</span>
           </span>
           <span class="bio-item">
