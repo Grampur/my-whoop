@@ -2,6 +2,7 @@ import Foundation
 import CoreBluetooth
 import WhoopProtocol
 import WhoopStore
+import UIKit
 
 /// CoreBluetooth engine for the WHOOP 4.0: scan-by-service → connect → discover →
 /// BOND (one confirmed write) → subscribe → reassemble char-05 frames → FrameRouter.
@@ -484,6 +485,16 @@ public final class BLEManager: NSObject, ObservableObject {
     }()
 
     private func log(_ s: String) {
+        // Suppress high-frequency routine logs in background to reduce CPU/memory overhead.
+        let isBackground = UIApplication.shared.applicationState == .background
+        if isBackground {
+            // Only log errors, connection events, and backfill session boundaries.
+            let isImportant = s.contains("Backfill:") || s.contains("Connected") ||
+                            s.contains("Disconnected") || s.contains("Bonded") ||
+                            s.contains("failed") || s.contains("error") ||
+                            s.contains("Watchdog") || s.contains("restored")
+            guard isImportant else { return }
+        }
         state.append(log: "[\(timestamp())] \(s)")
     }
     private func timestamp() -> String {
@@ -834,7 +845,7 @@ extension BLEManager: CBPeripheralDelegate {
              BLEManager.cmdNotifyChar,
              BLEManager.eventNotifyChar:
             // Reassemble (no-op for already-complete frames) then route each complete frame.
-            for frame in reassembler.feed(bytes) {
+            for frame in reassembler.feed(bytes) { autoreleasepool {
                 router.handle(frame: frame)                       // UI (always)
                 if frame.count > 6, frame[6] == WhoopCommand.getDataRange.rawValue,
                    let newest = BLEManager.dataRangeNewestUnix(from: frame) {
@@ -887,10 +898,10 @@ extension BLEManager: CBPeripheralDelegate {
                     }
                     collector?.ingest(frame)
                 }
-            }
+            } }
         default:
             break
-        }
+        } 
     }
 
     public func peripheral(_ peripheral: CBPeripheral,

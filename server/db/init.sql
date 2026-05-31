@@ -195,3 +195,5 @@ ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS sleep_end       TIMESTAMPTZ;
 ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS spo2_pct        REAL;
 ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS skin_temp_dev_c REAL;
 ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS resp_rate_bpm   REAL;
+ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS sleep_need_min  REAL;
+ALTER TABLE daily_metrics ADD COLUMN IF NOT EXISTS sleep_debt_min  REAL;
