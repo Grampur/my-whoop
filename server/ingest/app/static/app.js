@@ -694,7 +694,7 @@ function drawChart(cv, pts, color, opts = {}) {
   x.beginPath();
   validPts.forEach((p, i) => {
     const X = px(p.t), Y = py(p.v);
-    (i && (p.t - validPts[i - 1].t) <= gap) ? x.lineTo(X, Y) : x.lineTo(X, Y);
+    (i && (p.t - validPts[i - 1].t) <= gap) ? x.lineTo(X, Y) : x.moveTo(X, Y);
   });
   x.strokeStyle = color; x.lineWidth = 1.6; x.stroke();
   // last-point dot
@@ -854,7 +854,7 @@ function drawXTicks(x, t0, t1, px, padL, padT, W, H) {
    opts.gapMs overrides explicitly. Exported on globalThis for Node tests. */
 function gapThreshold(ts, opts = {}) {
   if (opts.gapMs != null) return opts.gapMs;
-  const FLOOR = 1800000; // 120 s
+  const FLOOR = 300000; // 120 s
   if (!ts || ts.length < 3) return FLOOR;
   const sorted = ts.slice().sort((a, b) => a - b);
   const diffs = [];

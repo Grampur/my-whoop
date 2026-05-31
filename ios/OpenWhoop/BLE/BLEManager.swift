@@ -583,7 +583,10 @@ extension BLEManager: CBCentralManagerDelegate {
         central.stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self
-        central.connect(peripheral, options: nil)
+        central.connect(peripheral, options: [
+            CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+            CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
+        ])
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -618,9 +621,17 @@ extension BLEManager: CBCentralManagerDelegate {
         if !intentionalDisconnect {
             log("Disconnected\(error.map { " — \($0.localizedDescription)" } ?? ""); rescanning in 3s")
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                guard let self, !self.intentionalDisconnect else { return }
+            guard let self, !self.intentionalDisconnect else { return }
+            if let p = self.peripheral {
+                self.log("Disconnected — reconnecting to known peripheral in background")
+                self.central.connect(p, options: [
+                    CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+                    CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
+                ])
+            } else {
                 self.connect()
             }
+        }
         } else {
             log("Disconnected (intentional)")
         }
