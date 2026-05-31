@@ -85,7 +85,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;
    so 24h fills the visible width) → the scroll content is genuinely wide, which is what
    lets sticky labels/axes work; a wider loaded range overflows → horizontal scroll.
    Labels, sub-heads and the y-axis overlay stick to the left so they stay readable. */
-.signals-scroll{overflow-x:auto;overflow-y:hidden;will-change:scroll-position;contain:strict}
+.signals-scroll{overflow-x:auto;overflow-y:hidden;will-change:scroll-position;contain:content}
 .signals-scroll .chart-wrap{position:relative;width:var(--sig-w,100%)}
 .signals-scroll .chart{width:100%;contain:strict}
 .signals-scroll .chart-label{position:sticky;left:0;justify-content:flex-start;gap:.6em;
