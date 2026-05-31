@@ -358,6 +358,27 @@ struct SleepView: View {
                         return WH.Color.recoveryGreen
                     }()
                 )
+
+                MetricCard(
+                    title: "Sleep Need",
+                    value: daily?.sleepNeedMin.map { String(format: "%.0f min", $0) } ?? "—",
+                    unit: nil,
+                    accentColor: daily?.sleepNeedMin != nil ? WH.Color.textPrimary : WH.Color.textSecondary
+                )
+                MetricCard(
+                    title: "Sleep Debt",
+                    value: {
+                        guard let d = daily?.sleepDebtMin else { return "—" }
+                        return String(format: "%+.0f min", d)
+                    }(),
+                    unit: nil,
+                    accentColor: {
+                        guard let d = daily?.sleepDebtMin else { return WH.Color.textSecondary }
+                        if d > 60 { return .red }
+                        if d > 0 { return WH.Color.recoveryYellow }
+                        return WH.Color.recoveryGreen
+                    }()
+                )
             }
         }
     }

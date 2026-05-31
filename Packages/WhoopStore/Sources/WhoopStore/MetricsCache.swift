@@ -44,15 +44,19 @@ public struct DailyMetric: Equatable, Codable {
     public let spo2Pct: Double?        // mean SpO2 (%) during sleep
     public let skinTempDevC: Double?   // skin-temperature deviation (°C) from baseline
     public let respRateBpm: Double?    // mean respiration rate (breaths/min) during sleep
+    public let sleepNeedMin: Double?
+    public let sleepDebtMin: Double?
     public init(day: String, totalSleepMin: Double?, efficiency: Double?, deepMin: Double?,
                 remMin: Double?, lightMin: Double?, disturbances: Int?, restingHr: Int?,
                 avgHrv: Double?, recovery: Double?, strain: Double?, exerciseCount: Int?,
-                spo2Pct: Double? = nil, skinTempDevC: Double? = nil, respRateBpm: Double? = nil) {
+                spo2Pct: Double? = nil, skinTempDevC: Double? = nil, respRateBpm: Double? = nil,
+                sleepNeedMin: Double? = nil, sleepDebtMin: Double? = nil) {
         self.day = day; self.totalSleepMin = totalSleepMin; self.efficiency = efficiency
         self.deepMin = deepMin; self.remMin = remMin; self.lightMin = lightMin
         self.disturbances = disturbances; self.restingHr = restingHr; self.avgHrv = avgHrv
         self.recovery = recovery; self.strain = strain; self.exerciseCount = exerciseCount
         self.spo2Pct = spo2Pct; self.skinTempDevC = skinTempDevC; self.respRateBpm = respRateBpm
+        self.sleepNeedMin = sleepNeedMin; self.sleepDebtMin = sleepDebtMin
     }
 }
 
@@ -94,8 +98,8 @@ extension WhoopStore {
                     INSERT INTO dailyMetric
                         (deviceId, day, totalSleepMin, efficiency, deepMin, remMin, lightMin,
                          disturbances, restingHr, avgHrv, recovery, strain, exerciseCount,
-                         spo2Pct, skinTempDevC, respRateBpm)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         spo2Pct, skinTempDevC, respRateBpm, sleepNeedMin, sleepDebtMin)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(deviceId, day) DO UPDATE SET
                         totalSleepMin = excluded.totalSleepMin,
                         efficiency = excluded.efficiency,
@@ -110,11 +114,13 @@ extension WhoopStore {
                         exerciseCount = excluded.exerciseCount,
                         spo2Pct = excluded.spo2Pct,
                         skinTempDevC = excluded.skinTempDevC,
-                        respRateBpm = excluded.respRateBpm
+                        respRateBpm = excluded.respRateBpm,
+                        sleepNeedMin = excluded.sleepNeedMin,
+                        sleepDebtMin = excluded.sleepDebtMin
                     """, arguments: [deviceId, d.day, d.totalSleepMin, d.efficiency, d.deepMin,
                                      d.remMin, d.lightMin, d.disturbances, d.restingHr, d.avgHrv,
                                      d.recovery, d.strain, d.exerciseCount,
-                                     d.spo2Pct, d.skinTempDevC, d.respRateBpm])
+                                     d.spo2Pct, d.skinTempDevC, d.respRateBpm, d.sleepNeedMin, d.sleepDebtMin])
                 n += db.changesCount
             }
             return n
@@ -145,7 +151,7 @@ extension WhoopStore {
             try Row.fetchAll(db, sql: """
                 SELECT day, totalSleepMin, efficiency, deepMin, remMin, lightMin, disturbances,
                        restingHr, avgHrv, recovery, strain, exerciseCount,
-                       spo2Pct, skinTempDevC, respRateBpm FROM dailyMetric
+                       spo2Pct, skinTempDevC, respRateBpm, sleepNeedMin, sleepDebtMin FROM dailyMetric
                 WHERE deviceId = ? AND day >= ? AND day <= ?
                 ORDER BY day ASC
                 """, arguments: [deviceId, from, to])
@@ -157,7 +163,8 @@ extension WhoopStore {
                                 avgHrv: $0["avgHrv"], recovery: $0["recovery"],
                                 strain: $0["strain"], exerciseCount: $0["exerciseCount"],
                                 spo2Pct: $0["spo2Pct"], skinTempDevC: $0["skinTempDevC"],
-                                respRateBpm: $0["respRateBpm"])
+                                respRateBpm: $0["respRateBpm"],
+                                sleepNeedMin: $0["sleepNeedMin"], sleepDebtMin: $0["sleepDebtMin"])
                 }
         }
     }

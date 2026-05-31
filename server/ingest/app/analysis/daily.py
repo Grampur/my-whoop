@@ -78,6 +78,7 @@ from . import strain as _strain
 from . import units as _units
 from . import baselines as _baselines
 from ._utils import to_epoch
+from . import sleep_need as _sleep_need
 
 _log = logging.getLogger(__name__)
 
@@ -461,6 +462,17 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
     # ── Calibrated nightly signals (APPROXIMATE; over the sleep window) ───────
     signals = _nightly_signals(conn, device_id, day, streams, night_start, night_end)
 
+    metrics_sleep_min = sleep_summary.get("total_sleep_min")
+
+    prior_day = day - _dt.timedelta(days=1)
+    prior_rows = read.query_daily(conn, device_id, prior_day, prior_day)
+    prior = prior_rows[0] if prior_rows else None
+    sleep_need_min = _sleep_need.compute_sleep_need(
+        prior_strain=float(prior["strain"]) if prior and prior.get("strain") is not None else None,
+        prior_recovery=float(prior["recovery"]) if prior and prior.get("recovery") is not None else None,
+    )
+    sleep_debt_min = _sleep_need.compute_sleep_debt(sleep_need_min, metrics_sleep_min)
+
     # ── Persist (idempotent upserts) ─────────────────────────────────────────
     night_dicts = [_session_to_dict(s) for s in night_sessions]
     ex_dicts = [_exercise_to_dict(e) for e in exercises]
@@ -481,6 +493,8 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
         "spo2_pct": signals["spo2_pct"],
         "skin_temp_dev_c": signals["skin_temp_dev_c"],
         "resp_rate_bpm": signals["resp_rate_bpm"],
+        "sleep_need_min": sleep_need_min,
+        "sleep_debt_min": sleep_debt_min,
     }
     # Delete the day's existing session rows first, then insert the fresh set, so a
     # recompute yielding FEWER sessions can't leave stale rows (which would desync
@@ -503,4 +517,6 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
         "spo2_pct": signals["spo2_pct"],
         "skin_temp_dev_c": signals["skin_temp_dev_c"],
         "resp_rate_bpm": signals["resp_rate_bpm"],
+        "sleep_need_min": sleep_need_min,
+        "sleep_debt_min": sleep_debt_min,
     }

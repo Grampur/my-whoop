@@ -367,7 +367,9 @@ final class ServerSync {
                                exerciseCount: int(r, "exercise_count") ?? int(r, "exerciseCount"),
                                spo2Pct: dbl(r, "spo2_pct") ?? dbl(r, "spo2Pct"),
                                skinTempDevC: dbl(r, "skin_temp_dev_c") ?? dbl(r, "skinTempDevC"),
-                               respRateBpm: dbl(r, "resp_rate_bpm") ?? dbl(r, "respRateBpm"))
+                               respRateBpm: dbl(r, "resp_rate_bpm") ?? dbl(r, "respRateBpm"),
+                               sleepNeedMin: dbl(r, "sleep_need_min") ?? dbl(r, "sleepNeedMin"),
+                               sleepDebtMin: dbl(r, "sleep_debt_min") ?? dbl(r, "sleepDebtMin")),
         }
     }
 
