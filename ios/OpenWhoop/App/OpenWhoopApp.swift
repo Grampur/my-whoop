@@ -2,11 +2,22 @@ import SwiftUI
 
 @main
 struct OpenWhoopApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             AppRoot()
         }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                NotificationCenter.default.post(name: .appDidBecomeActive, object: nil)
+            }
+        }
     }
+}
+
+extension Notification.Name {
+    static let appDidBecomeActive = Notification.Name("appDidBecomeActive")
 }
 
 /// Thin root wrapper that creates a MetricsRepository and LiveViewModel synchronously (no
