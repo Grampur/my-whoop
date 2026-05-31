@@ -253,6 +253,9 @@ main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;
 .bio-unit{font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:400;letter-spacing:.03em}
 /* Skin-temp deviation: green if positive (warm), cooler if negative — neutral otherwise. */
 .bio-val.skin-dev{color:var(--ink)}
+.bio-val.skin-dev.warm{color:var(--amber)}
+.bio-val.skin-dev.hot{color:#ff5a6e}
+.bio-val.skin-dev.cool{color:var(--phos)}
 
 /* ---------- DAILY · exercise per-bout detail (from /v1/compute-daily) ---------- */
 .ex-detail{margin:10px 0 4px;padding:0 2px;border-top:1px dashed var(--line2);padding-top:8px}
