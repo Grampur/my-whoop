@@ -350,7 +350,13 @@ struct SleepView: View {
                         return String(format: "%+.1f", t)
                     }(),
                     unit: daily?.skinTempDevC != nil ? "°C" : nil,
-                    accentColor: daily?.skinTempDevC != nil ? WH.Color.recoveryYellow : WH.Color.textSecondary
+                    accentColor: {
+                        guard let t = daily?.skinTempDevC else { return WH.Color.textSecondary }
+                        let abs = Swift.abs(t)
+                        if abs > 0.8 { return .red }
+                        if abs > 0.3 { return WH.Color.recoveryYellow }
+                        return WH.Color.recoveryGreen
+                    }()
                 )
             }
         }
