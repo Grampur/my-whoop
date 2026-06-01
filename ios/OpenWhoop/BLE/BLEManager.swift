@@ -567,13 +567,15 @@ public final class BLEManager: NSObject, ObservableObject {
 
     func enableV24DataProducts() {
         func ffPayload(_ name: String, on: Bool) -> [UInt8] {
-            let val: UInt8 = on ? 0x31 : 0x32  // "1" or "2" in ASCII
+            let val: UInt8 = on ? 0x31 : 0x32
             var payload = [UInt8(0x01)]
             let nameBytes = Array(name.utf8).prefix(32)
             payload += nameBytes + [UInt8](repeating: 0, count: 32 - nameBytes.count)
             payload += [val] + [UInt8](repeating: 0, count: 31)
             return payload
         }
+        // Auth handshake required before SET_FF_VALUE
+        send(.startFFKeyExchange, payload: [0x01], writeType: .withoutResponse)
         let flags = [
             "enable_write_r24_packets",
             "enable_write_r25_packets",
@@ -582,10 +584,17 @@ public final class BLEManager: NSObject, ObservableObject {
             "enable_sigproc_walk_detector"
         ]
         for flag in flags {
-            send(.setFFValue, payload: ffPayload(flag, on: true), writeType: .withResponse)
+            send(.setFFValue, payload: ffPayload(flag, on: true), writeType: .withoutResponse)
         }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.send(.rebootStrap, payload: [0x00], writeType: .withoutResponse)
+            self?.log("Strap rebooting to apply V24 flags")
+        }
+
         log("V24 data products enabled")
     }
+
 
 }
 
@@ -813,12 +822,12 @@ extension BLEManager: CBPeripheralDelegate {
         send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery)
         send(.enterHighFreqSync, payload: [])   
         send(.getDataRange)                          // refresh the strap's stored range for the watchdog
-        enableV24DataProducts()
         // Plain offload (no high-freq-sync), rate-limited (first connect always runs; reconnect-flaps are
         // throttled by BackfillPolicy). Deferred ~1.5s so SET_CLOCK/GET_DATA_RANGE round-trip first and
         // SEND_HISTORICAL runs on a settled link, like the paced Mac prototype. beginBackfill is itself
         // gated on connectHandshakeDone so a racing foreground/restore trigger can't fire it early.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.requestSync(.connect) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.requestSync(.connect)
+            self?.enableV24DataProducts()}
         // Start the type-40 REALTIME_DATA stream (HR + R-R intervals) for live collection.
         // Deferred 2s — after the backfill handshake settles — so it doesn't compete with
         // SEND_HISTORICAL on the BLE link. extractStreams reads type-40 exclusively for live HR
@@ -891,7 +900,7 @@ extension BLEManager: CBPeripheralDelegate {
                         // Conditional SET_CLOCK (mirrors WHOOP): only when the strap RTC has drifted /
                         // is frozen — not blindly every connect. Offload doesn't depend on this (it uses
                         // clockRef for decoding); SET_CLOCK only keeps FUTURE logging timestamps sane.
-                        if ClockPolicy.shouldSetClock(deviceClocxk: ref.device, wallNow: ref.wall) {
+                        if ClockPolicy.shouldSetClock(deviceClock: ref.device, wallNow: ref.wall) {
                             log("Clock drift detected — issuing SET_CLOCK")
                             send(.setClock, payload: BLEManager.setClockPayload())
                         }
