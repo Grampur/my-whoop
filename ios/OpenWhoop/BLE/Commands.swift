@@ -57,6 +57,9 @@ public enum WhoopCommand: UInt8, CaseIterable {
     /// Cancel / disarm the currently-armed firmware alarm. Payload [0x01].
     case disableAlarm          = 69
 
+    case setFFValue = 114
+    \
+
     /// Human-readable label for the command sender UI.
     public var label: String {
         switch self {
@@ -84,6 +87,7 @@ public enum WhoopCommand: UInt8, CaseIterable {
         case .getAlarmTime:          return "Get Alarm Time"
         case .runAlarm:              return "Run Alarm"
         case .disableAlarm:          return "Disable Alarm"
+        case .setFFValue:            return "SetFeature Flag"
         }
     }
 

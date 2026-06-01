@@ -138,9 +138,6 @@ public func extractStreams(_ parsed: [ParsedFrame],
         switch r.typeName {
         case "REALTIME_DATA":
             let ts = toWall(p["timestamp"]?.intValue, deviceClockRef, wallClockRef)
-            if let raw = p["timestamp"]?.intValue {
-                print("[DEBUG] type-40 raw=\(raw) wall=\(ts ?? -1) deviceClockRef=\(deviceClockRef) wallClockRef=\(wallClockRef)")
-            }
             if let ts = ts, let bpm = p["heart_rate"]?.intValue {
                 out.hr.append(HRSample(ts: ts, bpm: bpm))
             }

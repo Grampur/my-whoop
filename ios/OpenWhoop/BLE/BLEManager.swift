@@ -564,6 +564,29 @@ public final class BLEManager: NSObject, ObservableObject {
         // HR: prefer the custom stream once bonded; use 0x2A37 HR as a pre-bond fallback.
         if state.heartRate == nil || !state.bonded { state.heartRate = m.hr }
     }
+
+    func enableV24DataProducts() {
+        func ffPayload(_ name: String, on: Bool) -> [UInt8] {
+            let val: UInt8 = on ? 0x31 : 0x32  // "1" or "2" in ASCII
+            var payload = [UInt8(0x01)]
+            let nameBytes = Array(name.utf8).prefix(32)
+            payload += nameBytes + [UInt8](repeating: 0, count: 32 - nameBytes.count)
+            payload += [val] + [UInt8](repeating: 0, count: 31)
+            return payload
+        }
+        let flags = [
+            "enable_write_r24_packets",
+            "enable_write_r25_packets",
+            "enable_r19_packets",
+            "sigproc_10_sec_dp",
+            "enable_sigproc_walk_detector"
+        ]
+        for flag in flags {
+            send(.setFFValue, payload: ffPayload(flag, on: true), writeType: .withResponse)
+        }
+        log("V24 data products enabled")
+    }
+
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -790,6 +813,7 @@ extension BLEManager: CBPeripheralDelegate {
         send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery)
         send(.enterHighFreqSync, payload: [])   
         send(.getDataRange)                          // refresh the strap's stored range for the watchdog
+        enableV24DataProducts()
         // Plain offload (no high-freq-sync), rate-limited (first connect always runs; reconnect-flaps are
         // throttled by BackfillPolicy). Deferred ~1.5s so SET_CLOCK/GET_DATA_RANGE round-trip first and
         // SEND_HISTORICAL runs on a settled link, like the paced Mac prototype. beginBackfill is itself
@@ -867,7 +891,7 @@ extension BLEManager: CBPeripheralDelegate {
                         // Conditional SET_CLOCK (mirrors WHOOP): only when the strap RTC has drifted /
                         // is frozen — not blindly every connect. Offload doesn't depend on this (it uses
                         // clockRef for decoding); SET_CLOCK only keeps FUTURE logging timestamps sane.
-                        if ClockPolicy.shouldSetClock(deviceClock: ref.device, wallNow: ref.wall) {
+                        if ClockPolicy.shouldSetClock(deviceClocxk: ref.device, wallNow: ref.wall) {
                             log("Clock drift detected — issuing SET_CLOCK")
                             send(.setClock, payload: BLEManager.setClockPayload())
                         }

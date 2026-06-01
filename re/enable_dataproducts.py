@@ -74,10 +74,16 @@ async def call(c, cmd, payload, timeout=2.5):
 
 
 async def connect():
-    dev = await BleakScanner.find_device_by_address(ADDR, timeout=20.0)
-    if dev is None:
+    target = None
+    devices = await BleakScanner.discover(timeout=10.0)
+    for d in devices:
+        if d.address == ADDR:
+            target = d
+            break
+    if target is None:
+        print("strap not found in scan")
         return None
-    c = BleakClient(dev)
+    c = BleakClient(target, timeout=30.0)
     await c.connect()
     await c.start_notify(CMD_FROM, cmd_from_cb)
     await c.start_notify(EVENTS, events_cb)
