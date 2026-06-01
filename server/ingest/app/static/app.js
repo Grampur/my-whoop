@@ -110,6 +110,7 @@ async function loadAll() {
     // Union extent across all loaded stream series (only series with data contribute).
     const dom = streamDomain([hrPts, battPts, spo2Pts, skinPts, respPts, gxPts]);
     dom.tMax = Math.max(Date.now(), dom.tMax ?? 0);   // anchor the right edge to live "now"
+    if (state.range !== 'all') dom.tMin = Math.max(dom.tMin ?? 0, (Date.now() - (+state.range * 1000)));
     dom.nowEdge = true;
     // Size the signal canvases so 24h fills the visible width (wider loaded range →
     // horizontal scroll). MUST run before the draws so sizeCanvas measures the new width.
