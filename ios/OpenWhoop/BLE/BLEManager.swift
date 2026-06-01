@@ -565,32 +565,6 @@ public final class BLEManager: NSObject, ObservableObject {
         if state.heartRate == nil || !state.bonded { state.heartRate = m.hr }
     }
 
-    func enableV24DataProducts() {
-        func ffPayload(_ name: String, on: Bool) -> [UInt8] {
-            let val: UInt8 = on ? 0x31 : 0x32
-            var payload = [UInt8(0x01)]
-            let nameBytes = Array(name.utf8).prefix(32)
-            payload += nameBytes + [UInt8](repeating: 0, count: 32 - nameBytes.count)
-            payload += [val] + [UInt8](repeating: 0, count: 31)
-            return payload
-        }
-        // Auth handshake required before SET_FF_VALUE
-        send(.startFFKeyExchange, payload: [0x01], writeType: .withoutResponse)
-        let flags = [
-            "enable_write_r24_packets",
-            "enable_write_r25_packets",
-            "enable_r19_packets",
-            "sigproc_10_sec_dp",
-            "enable_sigproc_walk_detector"
-        ]
-        for flag in flags {
-            send(.setFFValue, payload: ffPayload(flag, on: true), writeType: .withoutResponse)
-        }
-        
-        send(.rebootStrap, payload: [0x00], writeType: .withoutResponse)
-        log("Strap rebooting to apply V24 flags — will not run again")
-        log("V24 data products enabled")
-    }
 
 
 }
@@ -816,8 +790,7 @@ extension BLEManager: CBPeripheralDelegate {
                                            // the app's old default [0x00] is a wrong length the strap ignores.
                                            // GET_CLOCK response will refine the clockRef if it arrives.
         }
-        send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery)
-        send(.enterHighFreqSync, payload: [])   
+        send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery) 
         send(.getDataRange)                          // refresh the strap's stored range for the watchdog
         // Plain offload (no high-freq-sync), rate-limited (first connect always runs; reconnect-flaps are
         // throttled by BackfillPolicy). Deferred ~1.5s so SET_CLOCK/GET_DATA_RANGE round-trip first and
@@ -825,10 +798,6 @@ extension BLEManager: CBPeripheralDelegate {
         // gated on connectHandshakeDone so a racing foreground/restore trigger can't fire it early.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.requestSync(.connect)
-            if !UserDefaults.standard.bool(forKey: "v24FlagsEnabled") {
-                self?.enableV24DataProducts()
-                UserDefaults.standard.set(true, forKey: "v24FlagsEnabled")
-            }
         }
         // Start the type-40 REALTIME_DATA stream (HR + R-R intervals) for live collection.
         // Deferred 2s — after the backfill handshake settles — so it doesn't compete with
