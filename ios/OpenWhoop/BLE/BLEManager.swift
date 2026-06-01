@@ -521,8 +521,15 @@ public final class BLEManager: NSObject, ObservableObject {
     func armStrapAlarm(at date: Date) {
         let epochSec = UInt32(date.timeIntervalSince1970)
         send(.setClock, payload: BLEManager.setClockPayload())
-        send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec))
-        log("Alarm: armed for \(date) (epoch \(epochSec))")
+        // withResponse ensures the strap ACKs the write — without this the alarm
+        // epoch is silently dropped and the strap never fires.
+        send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
+            writeType: .withResponse)
+        // Verify the epoch was latched — response appears in the BLE log on cmd-notify.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.send(.getAlarmTime, payload: [0x01])
+        }
+        log("Alarm: armed for \(date) (epoch \(epochSec)) — awaiting strap ACK")
     }
 
     /// Disarm the currently-armed firmware alarm.

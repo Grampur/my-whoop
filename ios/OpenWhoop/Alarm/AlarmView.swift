@@ -238,16 +238,9 @@ struct AlarmView: View {
         let fireDate = nextOccurrence(hour: wakeByHour, minute: wakeByMinute)
         alarmEnabled = true
         armedEpoch   = fireDate.timeIntervalSince1970
-        // armStrapAlarm returns the shared BLEManager so SmartAlarmController can hold it weakly.
-        let ble = live.armStrapAlarm(at: fireDate)
-        // Wire up smart-wake if enabled (SmartAlarmController arms itself in the window)
-        if smartWakeEnabled {
-            SmartAlarmController.shared.schedule(
-                wakeBy: fireDate,
-                leadMinutes: smartWakeLeadMin,
-                ble: ble
-            )
-        }
+        live.armStrapAlarm(at: fireDate)
+        // SmartAlarmController disabled — uses enterHighFreqSync which breaks
+        // data pipeline on this firmware. Fixed-time firmware alarm is the path.
     }
 
     private func disableAlarm() {

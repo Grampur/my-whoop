@@ -60,9 +60,8 @@ public final class LiveViewModel: ObservableObject {
     /// Arm the strap's firmware alarm for `date`. Also returns the BLEManager so
     /// SmartAlarmController can hold a weak reference to the shared instance.
     @discardableResult
-    public func armStrapAlarm(at date: Date) -> BLEManager {
+    public func armStrapAlarm(at date: Date) {
         ble.armStrapAlarm(at: date)
-        return ble
     }
 
     /// Disarm the currently-armed firmware alarm.
