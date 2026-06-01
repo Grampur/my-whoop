@@ -269,6 +269,7 @@ public final class BLEManager: NSObject, ObservableObject {
     /// Start a historical-offload session: tell the store machine to begin, flip the routing
     /// flag, kick the strap with sendHistoricalData, and arm the idle timeout.
     private func beginBackfill() {
+        print("[BLE] beginBackfill called, connectHandshakeDone=\(connectHandshakeDone)")
         // Never offload before the connect handshake has run: a racing foreground/restore trigger
         // firing SEND_HISTORICAL ahead of hello/SET_CLOCK was part of the storm that stopped serving.
         guard connectHandshakeDone else {
@@ -296,6 +297,7 @@ public final class BLEManager: NSObject, ObservableObject {
     /// synchronously (delegate order) and drained sequentially by a single task, so START /
     /// data / END chunk assembly is never reordered (Backfiller.ingest is async).
     private func routeBackfillFrame(_ frame: [UInt8]) {
+        print("[BLE] routeBackfillFrame type=\(frame.count > 4 ? frame[4] : 0)")
         backfillFrameQueue.append(frame)
         guard !backfillDraining else { return }
         backfillDraining = true
@@ -758,6 +760,7 @@ extension BLEManager: CBPeripheralDelegate {
         guard !connectHandshakeDone else { return }
         connectHandshakeDone = true
         backfillStarted = true
+        print("[BLE] handshake done — about to send hello/setClock/sendHistorical")
 
         // WHOOP-faithful connect lifecycle: hello → set RTC,
         // then offload. Hello is NOT strictly required to serve — verified on this strap via the Mac
@@ -878,6 +881,7 @@ extension BLEManager: CBPeripheralDelegate {
                     // delays each chunk's insert→trim-ack — the strap then stalls waiting for the ack
                     // and the 20 s watchdog fires (the residual timeout). Drop the flood during offload.
                     if BLEManager.isOffloadFrame(frame) {
+                        print("[BLE] offload frame type=\(frame[4])")
                         armBackfillTimeout()
                         routeBackfillFrame(frame)
                     }
