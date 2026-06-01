@@ -289,6 +289,7 @@ func registerPostHooks() {
         guard let length = length else { return }
         let spec = schema.packet(forType: Int(frame[4]))
         let version = Int(frame[5])
+        print("[HIST] v=\(version) len=\(frame.count) ok=\(frame.count >= 8)")
         fb.parsed["hist_version"] = .int(version)
         guard let entry = spec.flatMap({ schema.resolveVersion($0.versions, version) }) else {
             fb.region(7, length, "HISTORICAL_DATA v\(version) (unmapped layout)", "unknown")
