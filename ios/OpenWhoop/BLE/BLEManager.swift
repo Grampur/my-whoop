@@ -520,17 +520,24 @@ public final class BLEManager: NSObject, ObservableObject {
     /// alarm persists across BLE disconnect (cannot be verified in the simulator).
     func armStrapAlarm(at date: Date) {
         let epochSec = UInt32(date.timeIntervalSince1970)
-        send(.setClock, payload: BLEManager.setClockPayload())
-        // withResponse ensures the strap ACKs the write — without this the alarm
-        // epoch is silently dropped and the strap never fires.
-        send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
-            writeType: .withResponse)
-        // Verify the epoch was latched — response appears in the BLE log on cmd-notify.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.send(.getAlarmTime, payload: [0x01])
+        // Clear any existing alarm first — some firmware won't overwrite without a disable
+        send(.disableAlarm, payload: [0x01])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            self.send(.setClock, payload: BLEManager.setClockPayload())
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self else { return }
+                self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
+                          writeType: .withResponse)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.send(.getAlarmTime, payload: [0x01])
+                }
+                self.log("Alarm: armed for \(date) (epoch \(epochSec)) — awaiting strap ACK")
+            }
         }
-        log("Alarm: armed for \(date) (epoch \(epochSec)) — awaiting strap ACK")
     }
+
+
 
     /// Disarm the currently-armed firmware alarm.
     func disableStrapAlarm() {
