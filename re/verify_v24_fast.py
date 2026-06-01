@@ -19,7 +19,7 @@ import sys
 import time
 from collections import Counter
 
-sys.path.insert(0, "whoomp/scripts")
+sys.path.insert(0, "whoomp_stubs")
 from packet import WhoopPacket, PacketType, CommandNumber  # noqa: E402
 from bleak import BleakClient, BleakScanner  # noqa: E402
 

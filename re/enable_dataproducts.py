@@ -11,7 +11,7 @@ import struct
 import sys
 import time
 
-sys.path.insert(0, "whoomp/scripts")
+sys.path.insert(0, "whoomp_stubs")
 from packet import WhoopPacket, PacketType, CommandNumber, EventNumber  # noqa: E402
 from bleak import BleakClient, BleakScanner  # noqa: E402
 
