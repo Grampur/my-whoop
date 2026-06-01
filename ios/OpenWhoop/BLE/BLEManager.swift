@@ -785,6 +785,7 @@ extension BLEManager: CBPeripheralDelegate {
                                            // GET_CLOCK response will refine the clockRef if it arrives.
         }
         send(.sendR10R11Realtime, payload: [0x00])   // stop the type-43 realtime flood (BLE airtime/battery)
+        send(.enterHighFreqSync, payload: [])   
         send(.getDataRange)                          // refresh the strap's stored range for the watchdog
         // Plain offload (no high-freq-sync), rate-limited (first connect always runs; reconnect-flaps are
         // throttled by BackfillPolicy). Deferred ~1.5s so SET_CLOCK/GET_DATA_RANGE round-trip first and
