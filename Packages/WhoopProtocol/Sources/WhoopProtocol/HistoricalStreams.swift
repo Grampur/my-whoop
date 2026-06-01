@@ -19,6 +19,7 @@ public func extractHistoricalStreams(_ parsed: [ParsedFrame],
         let p = r.parsed
         switch r.typeName {
         case "HISTORICAL_DATA":
+            print("[EXTRACT] v=\(p["hist_version"]?.intValue ?? -1) ts=\(p["unix"]?.intValue ?? -1) spo2_red=\(p["spo2_red"]?.intValue ?? -1)")
             // type-47 carries a REAL unix timestamp + the full DSP record. No wall-clock offset.
             guard let ts = p["unix"]?.intValue else { continue }
             if let bpm = p["heart_rate"]?.intValue, bpm != 0 {  // skip startup hr=0
