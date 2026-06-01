@@ -587,11 +587,8 @@ public final class BLEManager: NSObject, ObservableObject {
             send(.setFFValue, payload: ffPayload(flag, on: true), writeType: .withoutResponse)
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.send(.rebootStrap, payload: [0x00], writeType: .withoutResponse)
-            self?.log("Strap rebooting to apply V24 flags")
-        }
-
+        send(.rebootStrap, payload: [0x00], writeType: .withoutResponse)
+        log("Strap rebooting to apply V24 flags — will not run again")
         log("V24 data products enabled")
     }
 
@@ -826,8 +823,13 @@ extension BLEManager: CBPeripheralDelegate {
         // throttled by BackfillPolicy). Deferred ~1.5s so SET_CLOCK/GET_DATA_RANGE round-trip first and
         // SEND_HISTORICAL runs on a settled link, like the paced Mac prototype. beginBackfill is itself
         // gated on connectHandshakeDone so a racing foreground/restore trigger can't fire it early.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.requestSync(.connect)
-            self?.enableV24DataProducts()}
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.requestSync(.connect)
+            if !UserDefaults.standard.bool(forKey: "v24FlagsEnabled") {
+                self?.enableV24DataProducts()
+                UserDefaults.standard.set(true, forKey: "v24FlagsEnabled")
+            }
+        }
         // Start the type-40 REALTIME_DATA stream (HR + R-R intervals) for live collection.
         // Deferred 2s — after the backfill handshake settles — so it doesn't compete with
         // SEND_HISTORICAL on the BLE link. extractStreams reads type-40 exclusively for live HR
