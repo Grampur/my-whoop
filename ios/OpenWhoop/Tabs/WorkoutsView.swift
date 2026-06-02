@@ -215,6 +215,7 @@ struct WorkoutsView: View {
 
     private func reload() async {
         errorMessage = nil
+        await metrics.refresh()
         let (from, to) = dateRange()
         let result = await metrics.workouts(from: from, to: to)
         workouts = result
