@@ -338,6 +338,12 @@ final class ServerSync {
                 try? await store.upsertSleepSessions(sessions, deviceId: deviceId)
             }
         }
+
+        // /v1/workouts — cache the full window so WorkoutsView works offline.
+        let cachedWorkouts = await fetchWorkoutsForCache(from: fromDay, to: toDay)
+        if !cachedWorkouts.isEmpty {
+            try? await store.upsertWorkouts(cachedWorkouts, deviceId: deviceId)
+        }
     }
 
     private func getDaily(from: String, to: String) async -> [DailyMetric]? {
@@ -404,6 +410,47 @@ final class ServerSync {
                                       restingHr: int(r, "resting_hr") ?? int(r, "restingHr"),
                                       avgHrv: dbl(r, "avg_hrv") ?? dbl(r, "avgHrv"),
                                       stagesJSON: stagesJSON)
+        }
+    }
+
+    /// Fetches /v1/workouts and converts to CachedWorkout for SQLite persistence.
+    /// Separate from getWorkouts() which returns the app-layer Workout model.
+    private func fetchWorkoutsForCache(from: String, to: String) async -> [CachedWorkout] {
+        let path = "/v1/workouts?device=\(deviceId)&from=\(from)&to=\(to)"
+        guard let body = await get(path: path),
+              let arr = (try? JSONSerialization.jsonObject(with: body)) as? [[String: Any]] else {
+            return []
+        }
+        let int = ServerSync.int
+        let dbl = ServerSync.dbl
+        func epoch(_ r: [String: Any], _ k: String) -> Int? {
+            if let s = r[k] as? String { return ServerSync.parseEpoch(s) }
+            return int(r, k)
+        }
+        return arr.compactMap { r in
+            guard let start = epoch(r, "start_ts") ?? epoch(r, "startTs"),
+                  let end   = epoch(r, "end_ts")   ?? epoch(r, "endTs"),
+                  let avgHr  = dbl(r, "avg_hr")    ?? dbl(r, "avgHr"),
+                  let peakHr = int(r, "peak_hr")   ?? int(r, "peakHr"),
+                  let durS   = int(r, "duration_s") ?? int(r, "durationS") else { return nil }
+            // Serialize zone_time_pct dict to JSON text for SQLite storage.
+            var zoneJSON: String? = nil
+            if let zObj = r["zone_time_pct"],
+               let data = try? JSONSerialization.data(withJSONObject: zObj) {
+                zoneJSON = String(decoding: data, as: UTF8.self)
+            }
+            return CachedWorkout(
+                startTs: start, endTs: end, avgHr: avgHr, peakHr: peakHr,
+                strain: dbl(r, "strain"),
+                kind: r["kind"] as? String,
+                durationS: durS,
+                zoneTimePctJSON: zoneJSON,
+                avgHrrPct: dbl(r, "avg_hrr_pct") ?? dbl(r, "avgHrrPct"),
+                hrmax: dbl(r, "hrmax"),
+                hrmaxSource: (r["hrmax_source"] as? String) ?? (r["hrmaxSource"] as? String) ?? "",
+                caloriesKcal: dbl(r, "calories_kcal") ?? dbl(r, "caloriesKcal"),
+                caloriesKj: dbl(r, "calories_kj") ?? dbl(r, "caloriesKj")
+            )
         }
     }
 
