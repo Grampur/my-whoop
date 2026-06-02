@@ -157,6 +157,28 @@ extension WhoopStore {
                 t.add(column: "sleepDebtMin", .double)
             }
         }
+        migrator.registerMigration("v9") { db in
+            // Server-computed workout bouts cached locally so WorkoutsView works offline.
+            // Natural key (deviceId, startTs); mirrors server's exercise_sessions table.
+            // zone_time_pct stored as JSON text (Swift [Int:Double] → serialized on write).
+            try db.create(table: "workoutSession") { t in
+                t.column("deviceId", .text).notNull()
+                t.column("startTs", .integer).notNull()
+                t.column("endTs", .integer).notNull()
+                t.column("avgHr", .double)
+                t.column("peakHr", .integer)
+                t.column("strain", .double)
+                t.column("kind", .text)
+                t.column("durationS", .integer)
+                t.column("zoneTimePctJSON", .text)
+                t.column("avgHrrPct", .double)
+                t.column("hrmax", .double)
+                t.column("hrmaxSource", .text)
+                t.column("caloriesKcal", .double)
+                t.column("caloriesKj", .double)
+                t.primaryKey(["deviceId", "startTs"])
+            }
+        }
         return migrator
     }
 }

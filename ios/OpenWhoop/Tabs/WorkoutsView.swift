@@ -217,7 +217,7 @@ struct WorkoutsView: View {
         errorMessage = nil
         let (from, to) = dateRange()
         let result = await metrics.workouts(from: from, to: to)
-        if !result.isEmpty {workouts = result}
+        workouts = result
         if isLoading { isLoading = false }
     }
 

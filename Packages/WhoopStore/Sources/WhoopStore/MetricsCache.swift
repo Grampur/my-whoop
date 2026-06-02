@@ -60,8 +60,35 @@ public struct DailyMetric: Equatable, Codable {
     }
 }
 
-extension WhoopStore {
+public struct CachedWorkout: Equatable {
+    public let startTs: Int
+    public let endTs: Int
+    public let avgHr: Double
+    public let peakHr: Int
+    public let strain: Double?
+    public let kind: String?
+    public let durationS: Int
+    public let zoneTimePctJSON: String?   // [Int:Double] serialized as JSON text
+    public let avgHrrPct: Double?
+    public let hrmax: Double?
+    public let hrmaxSource: String
+    public let caloriesKcal: Double?
+    public let caloriesKj: Double?
 
+    public init(startTs: Int, endTs: Int, avgHr: Double, peakHr: Int, strain: Double?,
+                kind: String?, durationS: Int, zoneTimePctJSON: String?,
+                avgHrrPct: Double?, hrmax: Double?, hrmaxSource: String,
+                caloriesKcal: Double?, caloriesKj: Double?) {
+        self.startTs = startTs; self.endTs = endTs
+        self.avgHr = avgHr; self.peakHr = peakHr
+        self.strain = strain; self.kind = kind; self.durationS = durationS
+        self.zoneTimePctJSON = zoneTimePctJSON
+        self.avgHrrPct = avgHrrPct; self.hrmax = hrmax; self.hrmaxSource = hrmaxSource
+        self.caloriesKcal = caloriesKcal; self.caloriesKj = caloriesKj
+    }
+}
+
+extension WhoopStore {
     // MARK: - Upserts (idempotent by natural key; latest server value wins on conflict)
 
     /// Upsert cached sleep sessions. Natural key (deviceId, startTs). Returns rows changed.
@@ -127,6 +154,40 @@ extension WhoopStore {
         }
     }
 
+    /// Upsert cached workout bouts. Natural key (deviceId, startTs). Returns rows changed.
+    @discardableResult
+    public func upsertWorkouts(_ workouts: [CachedWorkout], deviceId: String) async throws -> Int {
+        try syncWrite { db in
+            var n = 0
+            for w in workouts {
+                try db.execute(sql: """
+                    INSERT INTO workoutSession
+                        (deviceId, startTs, endTs, avgHr, peakHr, strain, kind, durationS,
+                         zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(deviceId, startTs) DO UPDATE SET
+                        endTs = excluded.endTs,
+                        avgHr = excluded.avgHr,
+                        peakHr = excluded.peakHr,
+                        strain = excluded.strain,
+                        kind = excluded.kind,
+                        durationS = excluded.durationS,
+                        zoneTimePctJSON = excluded.zoneTimePctJSON,
+                        avgHrrPct = excluded.avgHrrPct,
+                        hrmax = excluded.hrmax,
+                        hrmaxSource = excluded.hrmaxSource,
+                        caloriesKcal = excluded.caloriesKcal,
+                        caloriesKj = excluded.caloriesKj
+                    """, arguments: [deviceId, w.startTs, w.endTs, w.avgHr, w.peakHr,
+                                     w.strain, w.kind, w.durationS, w.zoneTimePctJSON,
+                                     w.avgHrrPct, w.hrmax, w.hrmaxSource,
+                                     w.caloriesKcal, w.caloriesKj])
+                n += db.changesCount
+            }
+            return n
+        }
+    }
+
     // MARK: - Reads
 
     /// Cached sleep sessions overlapping [from, to] (by startTs), oldest first.
@@ -165,6 +226,30 @@ extension WhoopStore {
                                 spo2Pct: $0["spo2Pct"], skinTempDevC: $0["skinTempDevC"],
                                 respRateBpm: $0["respRateBpm"],
                                 sleepNeedMin: $0["sleepNeedMin"], sleepDebtMin: $0["sleepDebtMin"])
+                }
+        }
+    }
+
+    /// Cached workout bouts for [fromTs, toTs] (epoch seconds, by startTs), newest first.
+    public func workouts(deviceId: String, from fromTs: Int, to toTs: Int) async throws -> [CachedWorkout] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT startTs, endTs, avgHr, peakHr, strain, kind, durationS,
+                       zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj
+                FROM workoutSession
+                WHERE deviceId = ? AND startTs >= ? AND startTs <= ?
+                ORDER BY startTs DESC
+                """, arguments: [deviceId, fromTs, toTs])
+                .map {
+                    CachedWorkout(startTs: $0["startTs"], endTs: $0["endTs"],
+                                  avgHr: $0["avgHr"], peakHr: $0["peakHr"],
+                                  strain: $0["strain"], kind: $0["kind"],
+                                  durationS: $0["durationS"],
+                                  zoneTimePctJSON: $0["zoneTimePctJSON"],
+                                  avgHrrPct: $0["avgHrrPct"], hrmax: $0["hrmax"],
+                                  hrmaxSource: $0["hrmaxSource"] ?? "",
+                                  caloriesKcal: $0["caloriesKcal"],
+                                  caloriesKj: $0["caloriesKj"])
                 }
         }
     }

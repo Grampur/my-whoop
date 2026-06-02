@@ -23,7 +23,6 @@ final class MetricsRepository: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var lastRefreshedAt: Date?
     @Published private(set) var strainCoach: ServerSync.StrainCoach?
-    @Published private(set) var cachedWorkouts: [Workout] = []
 
     // Injected directly (test path): store + sync are ready immediately; skip ensureOpen.
     private var store: WhoopStore?
@@ -263,12 +262,53 @@ final class MetricsRepository: ObservableObject {
     /// Returns [] when unconfigured (no API key), offline, or on parse error — never throws.
     func workouts(from: String, to: String) async -> [Workout] {
         await ensureOpen()
-        let result = await serverSync?.getWorkouts(from: from, to: to)
-        if let result, !result.isEmpty {
-            cachedWorkouts = result   // update cache on success
-            return result
+        guard let store else { return [] }
+        let tables = try? await store.tableNames()
+        print("[WorkoutCache] tables: \(tables ?? [])")  // ← temporary
+
+        // Convert YYYY-MM-DD date strings to epoch-second bounds for the SQLite query.
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        let fromTs = fmt.date(from: from).map { Int($0.timeIntervalSince1970) } ?? 0
+        // toTs: end of the `to` day (midnight + 86399 seconds) so same-day workouts aren't excluded.
+        let toTs   = fmt.date(from: to).map { Int($0.timeIntervalSince1970) + 86_399 } ?? Int(Date().timeIntervalSince1970)
+
+        // 1. Always read SQLite first — works offline, instant.
+        let cached = (try? await store.workouts(deviceId: deviceId, from: fromTs, to: toTs)) ?? []
+
+        // 2. Try to refresh from server in the background; upsert happens inside pullDerived.
+        //    We don't await a separate getWorkouts() here — pullDerived() already fetches
+        //    and caches workouts via fetchWorkoutsForCache(). Just translate cached rows.
+        return cached.map { w in
+            // Deserialize zoneTimePctJSON back to [Int: Double].
+            var zones: [Int: Double] = [:]
+            if let json = w.zoneTimePctJSON,
+               let obj = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] {
+                for (k, v) in obj {
+                    if let zone = Int(k), let pct = (v as? NSNumber)?.doubleValue ?? (v as? Double) {
+                        zones[zone] = pct
+                    }
+                }
+            }
+            return Workout(
+                id: "\(deviceId)|\(w.startTs)",
+                deviceId: deviceId,
+                startTs: w.startTs,
+                endTs: w.endTs,
+                avgHr: w.avgHr,
+                peakHr: w.peakHr,
+                strain: w.strain,
+                kind: w.kind,
+                durationS: w.durationS,
+                zoneTimePct: zones,
+                avgHrrPct: w.avgHrrPct,
+                hrmax: w.hrmax,
+                hrmaxSource: w.hrmaxSource,
+                caloriesKcal: w.caloriesKcal,
+                caloriesKj: w.caloriesKj
+            )
         }
-        return cachedWorkouts         // fall back to last known
     }
 
     func fetchStrainCoach(date: String) async -> ServerSync.StrainCoach? {

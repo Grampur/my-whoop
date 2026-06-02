@@ -54,9 +54,12 @@ struct TrendsView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            await metrics.refresh()
+            // Read cache first — shows data instantly without waiting for the network.
             await reloadRows()
             isLoading = false
+            // Then refresh from server in the background.
+            await metrics.refresh()
+            await reloadRows()
             await reloadHR()
         }
         .refreshable {
