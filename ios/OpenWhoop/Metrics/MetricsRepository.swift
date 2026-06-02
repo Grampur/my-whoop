@@ -23,6 +23,7 @@ final class MetricsRepository: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var lastRefreshedAt: Date?
     @Published private(set) var strainCoach: ServerSync.StrainCoach?
+    @Published private(set) var cachedWorkouts: [Workout] = []
 
     // Injected directly (test path): store + sync are ready immediately; skip ensureOpen.
     private var store: WhoopStore?
@@ -137,6 +138,7 @@ final class MetricsRepository: ObservableObject {
         await ensureOpen()
         isRefreshing = true
         lastError = nil
+        await load()
         await serverSync?.pullDerived()
         await load()
         isRefreshing = false
@@ -261,7 +263,12 @@ final class MetricsRepository: ObservableObject {
     /// Returns [] when unconfigured (no API key), offline, or on parse error — never throws.
     func workouts(from: String, to: String) async -> [Workout] {
         await ensureOpen()
-        return await serverSync?.getWorkouts(from: from, to: to) ?? []
+        let result = await serverSync?.getWorkouts(from: from, to: to)
+        if let result, !result.isEmpty {
+            cachedWorkouts = result   // update cache on success
+            return result
+        }
+        return cachedWorkouts         // fall back to last known
     }
 
     func fetchStrainCoach(date: String) async -> ServerSync.StrainCoach? {
