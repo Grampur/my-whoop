@@ -149,6 +149,7 @@ final class MetricsRepository: ObservableObject {
         if let metric = today, let recovery = metric.recovery {
             RecoveryNotifier.notify(recovery: recovery, forDay: metric.day)
         }
+        SyncNudge.reschedule()
     }
 
     // MARK: - Range reads for Trends/Sleep tabs

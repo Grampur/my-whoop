@@ -102,6 +102,10 @@ struct SettingsView: View {
     @State private var saveStatus: SaveStatus = .idle
     @State private var isBackfilling = false
 
+    @AppStorage("com.openwhoop.bedtimeNudge.enabled") private var bedtimeEnabled = false
+    @State private var bedtimeHour: Int   = 22   // default 10 PM
+    @State private var bedtimeMinute: Int = 30
+
     private enum SaveStatus: Equatable {
         case idle
         case saving
@@ -139,6 +143,7 @@ struct SettingsView: View {
                 ageSection
                 sexSection
                 saveSection
+                notificationsSection
                 footerSection
             }
             .scrollContentBackground(.hidden)
@@ -297,6 +302,55 @@ struct SettingsView: View {
         }
     }
 
+    private var notificationsSection: some View {
+        Section {
+            Toggle("Bedtime Reminder", isOn: $bedtimeEnabled)
+                .tint(WH.Color.strainBlue)
+                .onChange(of: bedtimeEnabled) { enabled in
+                    if enabled {
+                        BedtimeNudge.schedule(hour: bedtimeHour, minute: bedtimeMinute)
+                    } else {
+                        BedtimeNudge.cancel()
+                    }
+                }
+
+            if bedtimeEnabled {
+                HStack {
+                    Text("Remind me at")
+                        .foregroundStyle(WH.Color.textPrimary)
+                    Spacer()
+                    Picker("Hour", selection: $bedtimeHour) {
+                        ForEach(18..<25, id: \.self) { h in   // 6 PM – midnight
+                            Text(formatHour(h % 24)).tag(h % 24)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(WH.Color.strainBlue)
+                    .onChange(of: bedtimeHour) { h in
+                        if bedtimeEnabled { BedtimeNudge.schedule(hour: h, minute: bedtimeMinute) }
+                    }
+
+                    Picker("Minute", selection: $bedtimeMinute) {
+                        ForEach([0, 15, 30, 45], id: \.self) { m in
+                            Text(String(format: ":%02d", m)).tag(m)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(WH.Color.strainBlue)
+                    .onChange(of: bedtimeMinute) { m in
+                        if bedtimeEnabled { BedtimeNudge.schedule(hour: bedtimeHour, minute: m) }
+                    }
+                }
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("A nightly reminder to wind down at a consistent time. Recovery scores improve with regular sleep schedules.")
+                .font(WH.Font.caption)
+                .foregroundStyle(WH.Color.textSecondary)
+        }
+    }
+
     private var footerSection: some View {
         Section {
             EmptyView()
@@ -310,6 +364,11 @@ struct SettingsView: View {
     // MARK: - Load
 
     private func loadProfile() async {
+
+        // 0. Restore saved bedtime time (enabled state comes from @AppStorage automatically).
+        bedtimeHour   = UserDefaults.standard.integer(forKey: BedtimeNudge.hourKey).nonZeroOr(22)
+        bedtimeMinute = UserDefaults.standard.integer(forKey: BedtimeNudge.minuteKey)
+
         // 1. Prefill from local cache immediately.
         if let local = ProfileStorage.load() {
             applyProfile(local)
@@ -466,6 +525,12 @@ struct SettingsView: View {
         if v.truncatingRemainder(dividingBy: 1) == 0 { return String(Int(v)) }
         return String(format: "%.1f", v)
     }
+
+    private func formatHour(_ h: Int) -> String {
+        let suffix = h < 12 ? "AM" : "PM"
+        let display = h == 0 ? 12 : (h > 12 ? h - 12 : h)
+        return "\(display) \(suffix)"
+    }
 }
 
 // MARK: - Preview
@@ -473,4 +538,11 @@ struct SettingsView: View {
 #Preview("Settings") {
     SettingsView()
         .environmentObject(MetricsRepository(deviceId: "preview"))
+}
+
+
+private extension Int {
+    /// Returns self if non-zero, otherwise `default`. Used to distinguish
+    /// "never set" (returns 0 from UserDefaults) from a legitimate 0 value.
+    func nonZeroOr(_ default: Int) -> Int { self == 0 ? `default` : self }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import BackgroundTasks
 
 @main
 struct OpenWhoopApp: App {
@@ -8,11 +9,28 @@ struct OpenWhoopApp: App {
         WindowGroup {
             AppRoot()
         }
+        .backgroundTask(.appRefresh("com.openwhoop.refresh")) {
+            await handleBackgroundRefresh()
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 NotificationCenter.default.post(name: .appDidBecomeActive, object: nil)
             }
+            if phase == .background {
+                scheduleBackgroundRefresh()
+            }
         }
+    }
+
+    private func scheduleBackgroundRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.openwhoop.refresh")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 min minimum
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    private func handleBackgroundRefresh() async {
+        let repo = MetricsRepository(deviceId: AppConfig.deviceId)
+        await repo.refresh()
     }
 }
 
@@ -38,5 +56,8 @@ private struct AppRoot: View {
         RootTabView()
             .environmentObject(metrics)
             .environmentObject(live)
-    }
+            .onAppear {
+                RecoveryNotifier.requestAuthorization()
+                SyncNudge.requestAuthorization()
+            }
 }
