@@ -51,7 +51,7 @@ extension Notification.Name {
 private struct AppRoot: View {
     @StateObject private var metrics = MetricsRepository(deviceId: AppConfig.deviceId)
     @StateObject private var live    = LiveViewModel(deviceId: AppConfig.deviceId)
-
+    
     var body: some View {
         RootTabView()
             .environmentObject(metrics)
@@ -60,4 +60,5 @@ private struct AppRoot: View {
                 RecoveryNotifier.requestAuthorization()
                 SyncNudge.requestAuthorization()
             }
+    }
 }
