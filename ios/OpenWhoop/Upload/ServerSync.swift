@@ -340,7 +340,14 @@ final class ServerSync {
         }
 
         // /v1/workouts — cache the full window so WorkoutsView works offline.
+        // DELETE first so stale rows from a server recompute (e.g. backfill-workouts collapsing
+        // duplicates) don't persist. ON CONFLICT DO UPDATE only updates rows that MATCH by startTs —
+        // it never removes rows whose startTs is gone from the server response.
         let cachedWorkouts = await fetchWorkoutsForCache(from: fromDay, to: toDay)
+        let wFromTs = fmt.date(from: fromDay).map { Int($0.timeIntervalSince1970) } ?? 0
+        let wToTs   = fmt.date(from: toDay).map   { Int($0.timeIntervalSince1970) + 86_399 }
+                    ?? Int(Date().timeIntervalSince1970)
+        try? await store.deleteWorkouts(deviceId: deviceId, from: wFromTs, to: wToTs)
         if !cachedWorkouts.isEmpty {
             try? await store.upsertWorkouts(cachedWorkouts, deviceId: deviceId)
         }

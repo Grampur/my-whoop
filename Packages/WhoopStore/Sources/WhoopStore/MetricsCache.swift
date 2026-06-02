@@ -230,6 +230,20 @@ extension WhoopStore {
         }
     }
 
+    /// Delete all cached workout bouts for [fromTs, toTs] (epoch seconds, by startTs).
+    /// Used before upserting a fresh server response so stale rows from a server recompute
+    /// don't persist alongside the new set.
+    @discardableResult
+    public func deleteWorkouts(deviceId: String, from fromTs: Int, to toTs: Int) async throws -> Int {
+        try syncWrite { db in
+            try db.execute(sql: """
+                DELETE FROM workoutSession
+                WHERE deviceId = ? AND startTs >= ? AND startTs <= ?
+                """, arguments: [deviceId, fromTs, toTs])
+            return db.changesCount
+        }
+    }
+
     /// Cached workout bouts for [fromTs, toTs] (epoch seconds, by startTs), newest first.
     public func workouts(deviceId: String, from fromTs: Int, to toTs: Int) async throws -> [CachedWorkout] {
         try syncRead { db in
