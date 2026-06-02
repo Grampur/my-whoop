@@ -337,7 +337,7 @@ public final class BLEManager: NSObject, ObservableObject {
     /// off). Timeout is generous (60 s, not 20 s): the unstoppable ~2/s type-43 raw flood eats BLE
     /// airtime, so genuine offload frames can arrive in bursts with multi-second lulls between chunks
     /// — a short watchdog cut sessions short mid-drain. Longer = more records drained per session.
-    static let backfillIdleTimeoutSeconds = 60
+    static let backfillIdleTimeoutSeconds = 180
     private func armBackfillTimeout() {
         backfillTimeout?.cancel()
         let item = DispatchWorkItem { [weak self] in
@@ -371,6 +371,12 @@ public final class BLEManager: NSObject, ObservableObject {
             UserDefaults.standard.set(state.lastSyncedAt, forKey: "lastSyncedAt")
         }
         checkStrapLiveness()         // safety-net: strap ahead of us AND our frontier frozen ⇒ stuck?
+
+        if reason == "timeout" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.requestSync(.timeout)
+            }
+        }
     }
 
     /// After an offload, judge liveness: stuck = strap reports records newer than our frontier AND our

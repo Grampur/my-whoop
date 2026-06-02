@@ -8,6 +8,7 @@ enum BackfillTrigger {
     case foreground  // the app became active (scenePhase .active)
     case manual      // the user tapped "Sync now"
     case strap       // an incoming strap EVENT packet (WHOOP's HighFreqSyncPrompt analog)
+    case timeout
 }
 
 /// Pure rate-limiter for historical-offload kicks. No BLE/store deps. Floors match WHOOP
@@ -24,6 +25,7 @@ enum BackfillPolicy {
         case .manual:                        return true
         case .connect, .foreground, .strap:  return elapsed >= eventFloorSeconds
         case .periodic:                      return elapsed >= periodicFloorSeconds
+        case .timeout:                       return true   // always resume a mid-drain timeout
         }
     }
 }
