@@ -329,4 +329,10 @@ final class MetricsRepository: ObservableObject {
         await ensureOpen()
         return await serverSync?.backfillWorkouts(from: from, to: to) ?? false
     }
+
+    // tagging workout
+    func tagWorkout(startTs: Int, kind: String?) async -> Bool {
+        return await serverSync?.tagWorkout(startTs: startTs, kind: kind) ?? false
+    }
+
 }

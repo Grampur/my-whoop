@@ -112,6 +112,12 @@ struct WorkoutsView: View {
                 .foregroundStyle(WH.Color.textSecondary)
                 .frame(width: 44, alignment: .leading)
 
+            if let type = WorkoutType(kind: w.kind) {
+                Image(systemName: type.icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(type.color)
+            }
+            
             Spacer()
 
             // Avg HR

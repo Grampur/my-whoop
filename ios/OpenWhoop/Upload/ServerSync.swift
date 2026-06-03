@@ -627,6 +627,22 @@ final class ServerSync {
         return await post(path: "/v1/backfill-workouts", body: bodyData)
     }
 
+    // Tagging workout
+    func tagWorkout(startTs: Int, kind: String?) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/v1/workouts/\(startTs)/kind?device=\(deviceId)") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["kind": kind as Any])
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            return (resp as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - HTTP helpers
 
     /// Perform a GET with the Bearer header. Returns the body Data only on 2xx; nil otherwise.

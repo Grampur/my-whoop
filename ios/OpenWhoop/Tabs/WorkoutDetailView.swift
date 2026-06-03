@@ -7,6 +7,11 @@ import SwiftUI
 struct WorkoutDetailView: View {
     let workout: Workout
 
+    @EnvironmentObject private var metrics: MetricsRepository
+    @State private var selectedKind: WorkoutType?
+    @State private var showingTagPicker = false
+    @State private var isSaving = false
+
     // MARK: - Body
 
     var body: some View {
@@ -28,6 +33,20 @@ struct WorkoutDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .preferredColorScheme(.dark)
+
+        .onAppear {
+            selectedKind = WorkoutType(kind: workout.kind)
+        }
+        .sheet(isPresented: $showingTagPicker) {
+            WorkoutTagPicker(selected: $selectedKind) { chosen in
+                Task {
+                    isSaving = true
+                    let ok = await metrics.tagWorkout(startTs: workout.startTs, kind: chosen?.rawValue)
+                    if ok { selectedKind = chosen }
+                    isSaving = false
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -46,13 +65,33 @@ struct WorkoutDetailView: View {
                 Text(formattedDuration)
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(WH.Color.strainBlue)
-                if let kind = workout.kind {
-                    Text("·")
-                        .foregroundStyle(WH.Color.textSecondary)
-                    Text(kind)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(WH.Color.textSecondary)
+                Button {
+                    showingTagPicker = true
+                } label: {
+                    HStack(spacing: 6) {
+                        if let type = selectedKind {
+                            Image(systemName: type.icon)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(type.color)
+                            Text(type.displayName)
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundStyle(type.color)
+                        } else {
+                            Image(systemName: "tag")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(WH.Color.textSecondary)
+                            Text("Tag workout")
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundStyle(WH.Color.textSecondary)
+                        }
+                        if isSaving {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .padding(.leading, 2)
+                        }
+                    }
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(WH.Spacing.md)

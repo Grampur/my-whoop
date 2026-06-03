@@ -303,6 +303,24 @@ def get_workouts(device: str,
     with psycopg.connect(cfg.db_dsn) as conn:
         return read.query_workouts(conn, device, start, end)
 
+# --- Workout tagging -----------------------------------------------------------
+@app.patch("/v1/workouts/{start_ts}/kind", dependencies=[Depends(require_auth)])
+def patch_workout_kind(start_ts: float, device: str, body: dict):
+    """Manually tag a workout's activity kind (e.g. 'golf', 'weightlifting')."""
+    kind = body.get("kind")  # None = clear the tag
+    with psycopg.connect(cfg.db_dsn) as conn:
+        result = conn.execute(
+            "UPDATE exercise_sessions SET kind = %s "
+            "WHERE device_id = %s AND ABS(EXTRACT(EPOCH FROM start_ts) - %s) < 2 "
+            "RETURNING start_ts",
+            (kind, device, start_ts)
+        )
+        row = result.fetchone()
+        conn.commit()
+    if row is None:
+        raise HTTPException(status_code=404, detail="workout not found")
+    return {"status": "ok", "kind": kind}
+
 
 # ── Backfill workouts endpoint ────────────────────────────────────────────────
 
