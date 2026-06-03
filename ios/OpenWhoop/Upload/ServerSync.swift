@@ -629,10 +629,14 @@ final class ServerSync {
 
     // Tagging workout
     func tagWorkout(startTs: Int, kind: String?) async -> Bool {
-        guard let url = URL(string: "\(baseURL)/v1/workouts/\(startTs)/kind?device=\(deviceId)") else { return false }
+        let path = "/v1/workouts/\(startTs)/kind?device=\(deviceId)"
+        print("[TagWorkout] path: \(path) kind: \(String(describing: kind))")
+        guard let url = URL(string: path, relativeTo: config.baseURL)
+                     ?? URL(string: config.baseURL.absoluteString + path) else { return false }
+        print("[TagWorkout] full url: \(url.absoluteString)")
         var req = URLRequest(url: url)
         req.httpMethod = "PATCH"
-        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["kind": kind as Any])
         do {
@@ -642,6 +646,7 @@ final class ServerSync {
             return false
         }
     }
+
 
     // MARK: - HTTP helpers
 
