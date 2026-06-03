@@ -188,6 +188,14 @@ extension WhoopStore {
         }
     }
 
+    public func updateWorkoutKind(deviceId: String, startTs: Int, kind: String?) async throws {
+        try syncWrite { db in
+            try db.execute(sql: """
+                UPDATE workoutSession SET kind = ? WHERE deviceId = ? AND startTs = ?
+                """, arguments: [kind, deviceId, startTs])
+        }
+    }
+
     // MARK: - Reads
 
     /// Cached sleep sessions overlapping [from, to] (by startTs), oldest first.
