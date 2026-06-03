@@ -333,7 +333,7 @@ final class MetricsRepository: ObservableObject {
     // tagging workout
     func tagWorkout(startTs: Int, kind: String?) async -> Bool {
         let ok = await serverSync?.tagWorkout(startTs: startTs, kind: kind) ?? false
-        if ok {
+        if ok, let store = store {
             try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
         }
         return ok
