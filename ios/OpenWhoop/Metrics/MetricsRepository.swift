@@ -351,14 +351,15 @@ final class MetricsRepository: ObservableObject {
         try? await store.deleteWorkouts(deviceId: deviceId, from: startTs, to: startTs)
         // Also clear any pending tag for this workout — delete wins.
         try? await store.deletePendingTag(deviceId: deviceId, startTs: startTs)
-        // Best-effort immediate server delete if online.
-        let ok = await serverSync?.deleteWorkout(startTs: startTs) ?? false
-        if ok {
-            // Server confirmed — nothing to queue.
-            try? await store.removePendingDelete(deviceId: deviceId, startTs: startTs)
-        } else {
-            // Server unreachable — queue for drain on next pullDerivedWindow.
-            try? await store.enqueuePendingDelete(deviceId: deviceId, startTs: startTs)
+        // Fire server delete in the background — don't await it.
+        // If it fails, enqueuePendingDelete handles retry on next pullDerivedWindow.
+        Task {
+            let ok = await serverSync?.deleteWorkout(startTs: startTs) ?? false
+            if ok {
+                try? await store.removePendingDelete(deviceId: deviceId, startTs: startTs)
+            } else {
+                try? await store.enqueuePendingDelete(deviceId: deviceId, startTs: startTs)
+            }
         }
         return true
     }
