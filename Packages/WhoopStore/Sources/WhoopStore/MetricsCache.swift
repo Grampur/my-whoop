@@ -209,6 +209,42 @@ extension WhoopStore {
         }
     }
 
+    // MARK: - Pending workout deletes
+
+    /// Queue a workout for server-side deletion. Idempotent — safe to call multiple times.
+    public func enqueuePendingDelete(deviceId: String, startTs: Int) async throws {
+        let now = Int(Date().timeIntervalSince1970)
+        try syncWrite { db in
+            try db.execute(sql: """
+                INSERT INTO pendingWorkoutDelete (deviceId, startTs, deletedAt)
+                VALUES (?, ?, ?)
+                ON CONFLICT(deviceId, startTs) DO NOTHING
+                """, arguments: [deviceId, startTs, now])
+        }
+    }
+
+    /// All pending deletes for a device.
+    public func pendingDeletes(deviceId: String) async throws -> [Int] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT startTs FROM pendingWorkoutDelete
+                WHERE deviceId = ?
+                ORDER BY deletedAt ASC
+                """, arguments: [deviceId])
+                .map { $0["startTs"] as Int }
+        }
+    }
+
+    /// Remove a startTs from the pending delete queue (call after successful server delete).
+    public func removePendingDelete(deviceId: String, startTs: Int) async throws {
+        try syncWrite { db in
+            try db.execute(sql: """
+                DELETE FROM pendingWorkoutDelete
+                WHERE deviceId = ? AND startTs = ?
+                """, arguments: [deviceId, startTs])
+        }
+    }
+
     // MARK: - Reads
 
     /// Cached sleep sessions overlapping [from, to] (by startTs), oldest first.

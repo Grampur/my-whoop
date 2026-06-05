@@ -85,6 +85,16 @@ struct WorkoutsView: View {
                     workoutRow(workout)
                 }
                 .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Task {
+                            await metrics.deleteWorkout(startTs: workout.startTs)
+                            workouts.removeAll { $0.startTs == workout.startTs }
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
         }
         .background(WH.Color.surface,

@@ -320,7 +320,6 @@ final class ServerSync {
         fmt.calendar = cal
         fmt.timeZone = TimeZone(identifier: "UTC")
         fmt.dateFormat = "yyyy-MM-dd"
-
         guard let start = cal.date(byAdding: .day, value: -windowDays, to: now) else { return }
         let fromDay = fmt.string(from: start)
         let toDay = fmt.string(from: now)
@@ -347,14 +346,35 @@ final class ServerSync {
         let wFromTs = fmt.date(from: fromDay).map { Int($0.timeIntervalSince1970) } ?? 0
         let wToTs   = fmt.date(from: toDay).map   { Int($0.timeIntervalSince1970) + 86_399 }
                     ?? Int(Date().timeIntervalSince1970)
+
         if !cachedWorkouts.isEmpty {
-            // Preserve any locally-tagged kinds before the delete wipes them
+            // 1. Drain pending deletes to server before touching the cache.
+            //    Must happen before delete+upsert so a just-drained row isn't re-inserted.
+            let pending = (try? await store.pendingDeletes(deviceId: deviceId)) ?? []
+            for startTs in pending {
+                if await deleteWorkout(startTs: startTs) {
+                    try? await store.removePendingDelete(deviceId: deviceId, startTs: startTs)
+                }
+            }
+
+            // 2. Re-fetch pending after drain (some may have failed and are still queued).
+            let stillPending = Set((try? await store.pendingDeletes(deviceId: deviceId)) ?? [])
+
+            // 3. Preserve any locally-tagged kinds before the delete wipes them.
             let taggedKinds = (try? await store.workoutKinds(deviceId: deviceId, from: wFromTs, to: wToTs)) ?? [:]
+
+            // 4. Delete+upsert as normal, filtering out still-pending rows so they don't come back.
             try? await store.deleteWorkouts(deviceId: deviceId, from: wFromTs, to: wToTs)
-            try? await store.upsertWorkouts(cachedWorkouts, deviceId: deviceId)
-            // Re-apply local tags for any row the server returned NULL for
+            let filteredWorkouts = cachedWorkouts.filter { !stillPending.contains($0.startTs) }
+            if !filteredWorkouts.isEmpty {
+                try? await store.upsertWorkouts(filteredWorkouts, deviceId: deviceId)
+            }
+
+            // 5. Re-apply local tags, skipping any rows that are still pending deletion.
             for (startTs, kind) in taggedKinds {
-                try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
+                if !stillPending.contains(startTs) {
+                    try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
+                }
             }
         }
     }
@@ -648,6 +668,24 @@ final class ServerSync {
         do {
             let (_, resp) = try await URLSession.shared.data(for: req)
             return (resp as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
+        }
+    }
+
+    /// DELETE /v1/workouts/{startTs}?device=<deviceId>
+    /// Returns true on 200/404 (404 means already gone — treat as success).
+    func deleteWorkout(startTs: Int) async -> Bool {
+        let path = "/v1/workouts/\(startTs)?device=\(deviceId)"
+        guard let url = URL(string: path, relativeTo: config.baseURL)
+                    ?? URL(string: config.baseURL.absoluteString + path) else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            return code == 200 || code == 404
         } catch {
             return false
         }
