@@ -321,6 +321,23 @@ def patch_workout_kind(start_ts: float, device: str, body: dict):
         raise HTTPException(status_code=404, detail="workout not found")
     return {"status": "ok", "kind": kind}
 
+# --- Delete Workout ------------------------------------------------------------
+@app.delete("/v1/workouts/{start_ts}", dependencies=[Depends(require_auth)])
+def delete_workout(start_ts: float, device: str):
+    """Delete a workout bout by start_ts. Returns 200 if deleted, 404 if not found."""
+    with psycopg.connect(cfg.db_dsn) as conn:
+        result = conn.execute(
+            "DELETE FROM exercise_sessions "
+            "WHERE device_id = %s AND ABS(EXTRACT(EPOCH FROM start_ts) - %s) < 2 "
+            "RETURNING start_ts",
+            (device, start_ts)
+        )
+        row = result.fetchone()
+        conn.commit()
+    if row is None:
+        raise HTTPException(status_code=404, detail="workout not found")
+    return {"status": "ok"}
+
 
 # ── Backfill workouts endpoint ────────────────────────────────────────────────
 

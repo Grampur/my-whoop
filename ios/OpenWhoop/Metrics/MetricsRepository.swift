@@ -343,4 +343,19 @@ final class MetricsRepository: ObservableObject {
         return true
     }
 
+    /// Delete a workout locally immediately, queue server delete for when connectivity returns.
+    func deleteWorkout(startTs: Int) async -> Bool {
+        await ensureOpen()
+        guard let store else { return false }
+        // Remove from local cache immediately.
+        try? await store.deleteWorkouts(deviceId: deviceId, from: startTs, to: startTs)
+        // Queue for server deletion — drained by pullDerivedWindow on next sync.
+        try? await store.enqueuePendingDelete(deviceId: deviceId, startTs: startTs)
+        // Best-effort immediate server delete if online; clear queue on success.
+        if let ok = await serverSync?.deleteWorkout(startTs: startTs), ok {
+            try? await store.removePendingDelete(deviceId: deviceId, startTs: startTs)
+        }
+        return true
+    }
+
 }
