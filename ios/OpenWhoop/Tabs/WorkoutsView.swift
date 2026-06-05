@@ -79,12 +79,14 @@ struct WorkoutsView: View {
     // MARK: - Workout list
 
     private var workoutList: some View {
-        VStack(spacing: 1) {
+        List {
             ForEach(workouts) { workout in
                 NavigationLink(destination: WorkoutDetailView(workout: workout)) {
                     workoutRow(workout)
                 }
-                .buttonStyle(.plain)
+                .listRowBackground(WH.Color.surface)
+                .listRowSeparatorTint(WH.Color.separator)
+                .listRowInsets(EdgeInsets())
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         Task {
@@ -97,6 +99,8 @@ struct WorkoutsView: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollDisabled(true)
         .background(WH.Color.surface,
                     in: RoundedRectangle(cornerRadius: WH.Radius.card, style: .continuous))
         .padding(WH.Spacing.md)
