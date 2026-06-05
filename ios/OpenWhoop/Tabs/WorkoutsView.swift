@@ -54,10 +54,8 @@ struct WorkoutsView: View {
     // MARK: - List / empty content
 
     private var listContent: some View {
-        ScrollView {
+        List {
             LazyVStack(alignment: .leading, spacing: 0) {
-
-                // Custom tight header (replaces the hidden system large-title nav bar)
                 ScreenHeader("Workouts")
 
                 if let err = errorMessage {
@@ -72,21 +70,23 @@ struct WorkoutsView: View {
                     workoutList
                 }
             }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
-        .background(WH.Color.background)
-    }
+    .listStyle(.plain)
+    .background(WH.Color.background)
+}
 
     // MARK: - Workout list
 
     private var workoutList: some View {
-        List {
+        VStack(spacing: 1) {
             ForEach(workouts) { workout in
                 NavigationLink(destination: WorkoutDetailView(workout: workout)) {
                     workoutRow(workout)
                 }
-                .listRowBackground(WH.Color.surface)
-                .listRowSeparatorTint(WH.Color.separator)
-                .listRowInsets(EdgeInsets())
+                .buttonStyle(.plain)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         Task {
@@ -99,8 +99,6 @@ struct WorkoutsView: View {
                 }
             }
         }
-        .listStyle(.plain)
-        .scrollDisabled(true)
         .background(WH.Color.surface,
                     in: RoundedRectangle(cornerRadius: WH.Radius.card, style: .continuous))
         .padding(WH.Spacing.md)
