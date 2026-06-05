@@ -347,9 +347,15 @@ final class ServerSync {
         let wFromTs = fmt.date(from: fromDay).map { Int($0.timeIntervalSince1970) } ?? 0
         let wToTs   = fmt.date(from: toDay).map   { Int($0.timeIntervalSince1970) + 86_399 }
                     ?? Int(Date().timeIntervalSince1970)
-        try? await store.deleteWorkouts(deviceId: deviceId, from: wFromTs, to: wToTs)
         if !cachedWorkouts.isEmpty {
+            // Preserve any locally-tagged kinds before the delete wipes them
+            let taggedKinds = (try? await store.workoutKinds(deviceId: deviceId, from: wFromTs, to: wToTs)) ?? [:]
+            try? await store.deleteWorkouts(deviceId: deviceId, from: wFromTs, to: wToTs)
             try? await store.upsertWorkouts(cachedWorkouts, deviceId: deviceId)
+            // Re-apply local tags for any row the server returned NULL for
+            for (startTs, kind) in taggedKinds {
+                try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
+            }
         }
     }
 

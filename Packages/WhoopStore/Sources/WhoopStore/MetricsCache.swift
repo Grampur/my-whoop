@@ -163,7 +163,7 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO workoutSession
                         (deviceId, startTs, endTs, avgHr, peakHr, strain, kind, durationS,
-                         zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj)
+                        zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(deviceId, startTs) DO UPDATE SET
                         endTs = excluded.endTs,
@@ -179,12 +179,25 @@ extension WhoopStore {
                         caloriesKcal = excluded.caloriesKcal,
                         caloriesKj = excluded.caloriesKj
                     """, arguments: [deviceId, w.startTs, w.endTs, w.avgHr, w.peakHr,
-                                     w.strain, w.kind, w.durationS, w.zoneTimePctJSON,
-                                     w.avgHrrPct, w.hrmax, w.hrmaxSource,
-                                     w.caloriesKcal, w.caloriesKj])
+                                    w.strain, w.kind, w.durationS, w.zoneTimePctJSON,
+                                    w.avgHrrPct, w.hrmax, w.hrmaxSource,
+                                    w.caloriesKcal, w.caloriesKj])
                 n += db.changesCount
             }
             return n
+        }
+    }
+
+    /// Returns a [startTs: kind] map for workouts in [from, to] that have a non-null kind.
+    /// Used by pullDerivedWindow to preserve locally-tagged kinds across a delete+upsert cycle.
+    public func workoutKinds(deviceId: String, from: Int, to: Int) async throws -> [Int: String] {
+        try syncRead { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT startTs, kind FROM workoutSession
+                WHERE deviceId = ? AND startTs >= ? AND startTs <= ?
+                AND kind IS NOT NULL
+                """, arguments: [deviceId, from, to])
+            return Dictionary(uniqueKeysWithValues: rows.map { ($0["startTs"] as Int, $0["kind"] as String) })
         }
     }
 
