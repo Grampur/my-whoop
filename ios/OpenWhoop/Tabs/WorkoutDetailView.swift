@@ -270,6 +270,7 @@ struct WorkoutDetailView: View {
             Button("Delete", role: .destructive) {
                 Task {
                     await metrics.deleteWorkout(startTs: workout.startTs)
+                    await metrics.refresh()
                     dismiss()
                 }
             }
