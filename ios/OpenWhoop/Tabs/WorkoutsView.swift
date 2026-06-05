@@ -81,7 +81,9 @@ struct WorkoutsView: View {
     private var workoutList: some View {
         VStack(spacing: 1) {
             ForEach(workouts) { workout in
-                NavigationLink(destination: WorkoutDetailView(workout: workout)) {
+                NavigationLink(destination: WorkoutDetailView(workout: workout, onDelete: {
+                    workouts.removeAll { $0.startTs == workout.startTs }
+                })) {
                     workoutRow(workout)
                 }
                 .buttonStyle(.plain)

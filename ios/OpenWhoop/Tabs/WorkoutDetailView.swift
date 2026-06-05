@@ -6,6 +6,7 @@ import SwiftUI
 
 struct WorkoutDetailView: View {
     let workout: Workout
+    var onDelete: (() -> Void)? = nil
 
     @EnvironmentObject private var metrics: MetricsRepository
     @State private var selectedKind: WorkoutType?
@@ -270,7 +271,7 @@ struct WorkoutDetailView: View {
             Button("Delete", role: .destructive) {
                 Task {
                     await metrics.deleteWorkout(startTs: workout.startTs)
-                    await metrics.refresh()
+                    onDelete?()
                     dismiss()
                 }
             }
