@@ -79,7 +79,7 @@ struct WorkoutsView: View {
 }
 
     // MARK: - Workout list
-
+    @State private var deletingStartTs: Set<Int> = []
     private var workoutList: some View {
         VStack(spacing: 1) {
             ForEach(workouts) { workout in
@@ -87,11 +87,14 @@ struct WorkoutsView: View {
                     workoutRow(workout)
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
+                        guard !deletingStartTs.contains(workout.startTs) else { return }
+                        deletingStartTs.insert(workout.startTs)
                         Task {
                             await metrics.deleteWorkout(startTs: workout.startTs)
                             workouts.removeAll { $0.startTs == workout.startTs }
+                            deletingStartTs.remove(workout.startTs)
                         }
                     } label: {
                         Label("Delete", systemImage: "trash")
