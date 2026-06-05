@@ -12,7 +12,6 @@ struct WorkoutsView: View {
     @State private var workouts: [Workout] = []
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
-    @State private var deletingStartTs: Set<Int> = []
 
     // MARK: - Body
 
@@ -56,7 +55,7 @@ struct WorkoutsView: View {
 
     private var listContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
                 ScreenHeader("Workouts")
 
                 if let err = errorMessage {
@@ -71,7 +70,9 @@ struct WorkoutsView: View {
                     workoutList
                 }
             }
+            .padding(.bottom, WH.Spacing.xl)
         }
+        .scrollContentBackground(.hidden)
         .background(WH.Color.background)
     }
 
@@ -80,17 +81,10 @@ struct WorkoutsView: View {
     private var workoutList: some View {
         VStack(spacing: 1) {
             ForEach(workouts) { workout in
-                DeletableWorkoutRow(workout: workout) {
-                    Task {
-                        guard !deletingStartTs.contains(workout.startTs) else { return }
-                        deletingStartTs.insert(workout.startTs)
-                        await metrics.deleteWorkout(startTs: workout.startTs)
-                        workouts.removeAll { $0.startTs == workout.startTs }
-                        deletingStartTs.remove(workout.startTs)
-                    }
-                } destination: {
-                    WorkoutDetailView(workout: workout)
+                NavigationLink(destination: WorkoutDetailView(workout: workout)) {
+                    workoutRow(workout)
                 }
+                .buttonStyle(.plain)
             }
         }
         .background(WH.Color.surface,
@@ -98,9 +92,7 @@ struct WorkoutsView: View {
         .padding(WH.Spacing.md)
     }
 
-    // MARK: - Row content (static so DeletableWorkoutRow can call it)
-
-    fileprivate static func rowContent(_ w: Workout) -> some View {
+    private func workoutRow(_ w: Workout) -> some View {
         HStack(spacing: WH.Spacing.sm) {
 
             // Date + time column
@@ -125,7 +117,7 @@ struct WorkoutsView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(type.color)
             }
-
+            
             Spacer()
 
             // Avg HR
@@ -163,7 +155,7 @@ struct WorkoutsView: View {
         .padding(.vertical, WH.Spacing.sm)
     }
 
-    private static func strainBadge(_ strain: Double?) -> some View {
+    private func strainBadge(_ strain: Double?) -> some View {
         Group {
             if let s = strain {
                 Text(String(format: "%.1f", s))
@@ -248,16 +240,16 @@ struct WorkoutsView: View {
         return (fmt.string(from: from), fmt.string(from: today))
     }
 
-    // MARK: - Formatting (static so rowContent can call them)
+    // MARK: - Formatting
 
-    private static func rowDate(_ ts: Int) -> String {
+    private func rowDate(_ ts: Int) -> String {
         let d = Date(timeIntervalSince1970: TimeInterval(ts))
         let fmt = DateFormatter()
         fmt.dateFormat = "EEE M/d"
         return fmt.string(from: d)
     }
 
-    private static func rowTime(_ ts: Int) -> String {
+    private func rowTime(_ ts: Int) -> String {
         let d = Date(timeIntervalSince1970: TimeInterval(ts))
         let fmt = DateFormatter()
         fmt.dateStyle = .none
@@ -265,70 +257,13 @@ struct WorkoutsView: View {
         return fmt.string(from: d)
     }
 
-    private static func formatDuration(_ seconds: Int) -> String {
+    private func formatDuration(_ seconds: Int) -> String {
         let totalMin = seconds / 60
         let h = totalMin / 60
         let m = totalMin % 60
         if h > 0 && m > 0 { return "\(h)h \(m)m" }
         if h > 0           { return "\(h)h" }
         return "\(m)m"
-    }
-}
-
-// MARK: - DeletableWorkoutRow
-
-private struct DeletableWorkoutRow<Destination: View>: View {
-    let workout: Workout
-    let onDelete: () -> Void
-    let destination: () -> Destination
-
-    @State private var offset: CGFloat = 0
-    @State private var showDelete = false
-    private let deleteWidth: CGFloat = 80
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete button revealed behind the row
-            Button(role: .destructive, action: onDelete) {
-                VStack(spacing: 4) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Delete")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .frame(width: deleteWidth)
-                .frame(maxHeight: .infinity)
-                .background(Color.red)
-            }
-
-            // Row content
-            NavigationLink(destination: destination()) {
-                WorkoutsView.rowContent(workout)
-            }
-            .buttonStyle(.plain)
-            .offset(x: offset)
-            .background(WH.Color.surface)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let drag = value.translation.width
-                        if drag < 0 {
-                            offset = max(drag, -deleteWidth)
-                        } else if showDelete {
-                            offset = min(drag - deleteWidth, 0)
-                        }
-                    }
-                    .onEnded { value in
-                        if value.translation.width < -deleteWidth / 2 {
-                            withAnimation(.spring()) { offset = -deleteWidth; showDelete = true }
-                        } else {
-                            withAnimation(.spring()) { offset = 0; showDelete = false }
-                        }
-                    }
-            )
-        }
-        .clipped()
     }
 }
 
