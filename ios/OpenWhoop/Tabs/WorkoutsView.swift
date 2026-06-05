@@ -55,9 +55,7 @@ struct WorkoutsView: View {
 
     private var listContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-
-                // Custom tight header (replaces the hidden system large-title nav bar)
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
                 ScreenHeader("Workouts")
 
                 if let err = errorMessage {
@@ -72,7 +70,9 @@ struct WorkoutsView: View {
                     workoutList
                 }
             }
+            .padding(.bottom, WH.Spacing.xl)
         }
+        .scrollContentBackground(.hidden)
         .background(WH.Color.background)
     }
 
