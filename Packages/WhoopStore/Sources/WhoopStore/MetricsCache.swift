@@ -209,6 +209,41 @@ extension WhoopStore {
         }
     }
 
+    // MARK: - Pending tag queue (offline tag sync)
+
+    /// Upsert a pending server tag for a workout. Called by tagWorkout when the PATCH fails.
+    /// Overwrites any existing pending tag for the same (deviceId, startTs).
+    public func enqueuePendingTag(deviceId: String, startTs: Int, kind: String?) async throws {
+        try syncWrite { db in
+            try db.execute(sql: """
+                INSERT INTO pendingWorkoutTag (deviceId, startTs, kind)
+                VALUES (?, ?, ?)
+                ON CONFLICT (deviceId, startTs) DO UPDATE SET kind = excluded.kind
+                """, arguments: [deviceId, startTs, kind])
+        }
+    }
+
+    /// Returns all pending tags for a device, ordered by startTs ascending.
+    public func pendingTags(deviceId: String) async throws -> [(startTs: Int, kind: String?)] {
+        try syncRead { db in
+            try Row.fetchAll(db, sql: """
+                SELECT startTs, kind FROM pendingWorkoutTag
+                WHERE deviceId = ?
+                ORDER BY startTs ASC
+                """, arguments: [deviceId])
+                .map { (startTs: $0["startTs"] as Int, kind: $0["kind"] as String?) }
+        }
+    }
+
+    /// Remove a successfully-synced pending tag.
+    public func deletePendingTag(deviceId: String, startTs: Int) async throws {
+        try syncWrite { db in
+            try db.execute(sql: """
+                DELETE FROM pendingWorkoutTag WHERE deviceId = ? AND startTs = ?
+                """, arguments: [deviceId, startTs])
+        }
+    }
+
     // MARK: - Reads
 
     /// Cached sleep sessions overlapping [from, to] (by startTs), oldest first.

@@ -179,6 +179,19 @@ extension WhoopStore {
                 t.primaryKey(["deviceId", "startTs"])
             }
         }
+        migrator.registerMigration("v10") { db in
+            // Pending workout tag queue: tags written locally while the server was offline.
+            // pullDerivedWindow drains this BEFORE fetching from the server so the server
+            // is patched first and the subsequent fetch already sees the correct kind.
+            // Natural key (deviceId, startTs): only one pending tag per workout at a time.
+            // kind is nullable: clearing a tag (kind = nil) must also sync back.
+            try db.create(table: "pendingWorkoutTag") { t in
+                t.column("deviceId", .text).notNull()
+                t.column("startTs", .integer).notNull()
+                t.column("kind", .text)   // NULL means clear the tag
+                t.primaryKey(["deviceId", "startTs"])
+            }
+        }
         return migrator
     }
 }

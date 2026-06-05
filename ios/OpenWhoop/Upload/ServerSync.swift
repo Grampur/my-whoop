@@ -325,6 +325,8 @@ final class ServerSync {
         let fromDay = fmt.string(from: start)
         let toDay = fmt.string(from: now)
 
+        await drainPendingTags()
+
         // /v1/daily over the window. This is the authoritative list of days WITH data.
         guard let days = await getDaily(from: fromDay, to: toDay) else { return }
         if !days.isEmpty {
@@ -634,12 +636,26 @@ final class ServerSync {
     }
 
     // Tagging workout
+    // MARK: - Workout tagging
+
+    /// PATCH /v1/workouts/{startTs}/kind?device=
+    /// On success returns true and removes any queued pending tag.
+    /// On failure enqueues the tag so pullDerivedWindow can drain it when server is back.
     func tagWorkout(startTs: Int, kind: String?) async -> Bool {
+        let ok = await patchWorkoutKind(startTs: startTs, kind: kind)
+        if ok {
+            try? await store.deletePendingTag(deviceId: deviceId, startTs: startTs)
+        } else {
+            try? await store.enqueuePendingTag(deviceId: deviceId, startTs: startTs, kind: kind)
+        }
+        return ok
+    }
+
+    /// Raw PATCH call -- no queue logic. Shared by tagWorkout and drainPendingTags.
+    private func patchWorkoutKind(startTs: Int, kind: String?) async -> Bool {
         let path = "/v1/workouts/\(startTs)/kind?device=\(deviceId)"
-        print("[TagWorkout] path: \(path) kind: \(String(describing: kind))")
         guard let url = URL(string: path, relativeTo: config.baseURL)
-                     ?? URL(string: config.baseURL.absoluteString + path) else { return false }
-        print("[TagWorkout] full url: \(url.absoluteString)")
+                    ?? URL(string: config.baseURL.absoluteString + path) else { return false }
         var req = URLRequest(url: url)
         req.httpMethod = "PATCH"
         req.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
@@ -650,6 +666,20 @@ final class ServerSync {
             return (resp as? HTTPURLResponse)?.statusCode == 200
         } catch {
             return false
+        }
+    }
+
+    /// Drain all pending offline tags to the server. Called at the TOP of
+    /// pullDerivedWindow so the server is patched before we fetch its workout list.
+    /// Successfully synced entries are removed; failures remain and retry next time.
+    private func drainPendingTags() async {
+        guard let pending = try? await store.pendingTags(deviceId: deviceId),
+            !pending.isEmpty else { return }
+        for entry in pending {
+            let ok = await patchWorkoutKind(startTs: entry.startTs, kind: entry.kind)
+            if ok {
+                try? await store.deletePendingTag(deviceId: deviceId, startTs: entry.startTs)
+            }
         }
     }
 
