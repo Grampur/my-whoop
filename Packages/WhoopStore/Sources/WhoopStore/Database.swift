@@ -195,7 +195,7 @@ extension WhoopStore {
         migrator.registerMigration("v11") { db in
         // Pending workout deletes: queued locally when offline, drained to server on next sync.
         // Natural key (deviceId, startTs). deletedAt is epoch seconds, used for ordering.
-        try db.create(table: "pendingWorkoutDelete") { t in
+        try db.create(table: "pendingWorkoutDelete", options: .ifNotExists) { t in
             t.column("deviceId", .text).notNull()
             t.column("startTs", .integer).notNull()
             t.column("deletedAt", .integer).notNull()
