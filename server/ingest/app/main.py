@@ -336,7 +336,7 @@ def delete_workout(start_ts: float, device: str):
         conn.commit()
     if row is None:
         raise HTTPException(status_code=404, detail="workout not found")
-    return {"status": "ok"}
+    return {"status": "deleted"}
 
 
 # ── Backfill workouts endpoint ────────────────────────────────────────────────

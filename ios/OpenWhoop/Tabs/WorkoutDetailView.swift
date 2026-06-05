@@ -11,6 +11,8 @@ struct WorkoutDetailView: View {
     @State private var selectedKind: WorkoutType?
     @State private var showingTagPicker = false
     @State private var isSaving = false
+    @State private var showingDeleteConfirm = false
+    @Environment(\.dismiss) private var dismiss
 
     // MARK: - Body
 
@@ -24,6 +26,7 @@ struct WorkoutDetailView: View {
                     zoneSection
                     contextSection
                     Spacer(minLength: WH.Spacing.xl)
+                    deleteButton
                 }
                 .padding(WH.Spacing.md)
             }
@@ -243,6 +246,36 @@ struct WorkoutDetailView: View {
                     )
                 }
             }
+        }
+    }
+
+    // MARK: - Delete button
+
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            showingDeleteConfirm = true
+        } label: {
+            Text("Delete Workout")
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, WH.Spacing.md)
+                .background(WH.Color.recoveryRed,
+                            in: RoundedRectangle(cornerRadius: WH.Radius.card, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .confirmationDialog("Delete this workout?",
+                            isPresented: $showingDeleteConfirm,
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await metrics.deleteWorkout(startTs: workout.startTs)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This is permanent and cannot be undone.")
         }
     }
 

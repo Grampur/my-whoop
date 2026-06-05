@@ -326,6 +326,7 @@ final class ServerSync {
         let toDay = fmt.string(from: now)
 
         await drainPendingTags()
+        await drainPendingDeletes()
 
         // /v1/daily over the window. This is the authoritative list of days WITH data.
         guard let days = await getDaily(from: fromDay, to: toDay) else { return }
@@ -357,6 +358,12 @@ final class ServerSync {
             // Re-apply local tags for any row the server returned NULL for
             for (startTs, kind) in taggedKinds {
                 try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
+            }
+            // Re-apply local deletes in case server re-upserted a workout we deleted offline.
+            if let stillPending = try? await store.pendingDeletes(deviceId: deviceId) {
+                for startTs in stillPending {
+                    try? await store.deleteWorkouts(deviceId: deviceId, from: startTs, to: startTs)
+                }
             }
         }
     }
@@ -679,6 +686,37 @@ final class ServerSync {
             let ok = await patchWorkoutKind(startTs: entry.startTs, kind: entry.kind)
             if ok {
                 try? await store.deletePendingTag(deviceId: deviceId, startTs: entry.startTs)
+            }
+        }
+    }
+
+    /// DELETE /v1/workouts/{startTs}?device=<deviceId>
+    /// Returns true on 200/404 (404 means already gone — treat as success).
+    func deleteWorkout(startTs: Int) async -> Bool {
+        let path = "/v1/workouts/\(startTs)?device=\(deviceId)"
+        guard let url = URL(string: path, relativeTo: config.baseURL)
+                    ?? URL(string: config.baseURL.absoluteString + path) else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            return code == 200 || code == 404
+        } catch {
+            return false
+        }
+    }
+
+    /// Drain all pending offline deletes to the server. Called at the TOP of
+    /// pullDerivedWindow before fetching so deleted workouts don't get re-upserted.
+    private func drainPendingDeletes() async {
+        guard let pending = try? await store.pendingDeletes(deviceId: deviceId),
+            !pending.isEmpty else { return }
+        for startTs in pending {
+            let ok = await deleteWorkout(startTs: startTs)
+            if ok {
+                try? await store.removePendingDelete(deviceId: deviceId, startTs: startTs)
             }
         }
     }
