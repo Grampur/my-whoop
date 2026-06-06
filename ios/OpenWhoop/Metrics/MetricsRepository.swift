@@ -134,8 +134,8 @@ final class MetricsRepository: ObservableObject {
         let coachFmt = DateFormatter()
         coachFmt.dateFormat = "yyyy-MM-dd"
         let todayStr = coachFmt.string(from: Date())
-        if let result = await serverSync?.getStrainCoach(date: todayStr), result.status == "ok" {
-            strainCoach = result
+        if let result = await serverSync?.getStrainCoach(date: todayStr) {
+            strainCoach = result.status == "ok" ? result : nil
         }
     }
 
