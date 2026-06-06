@@ -117,8 +117,9 @@ final class MetricsRepository: ObservableObject {
         if let start = cal.date(byAdding: .day, value: -14, to: now) {
             let fromDay = fmt.string(from: start)
             let toDay = fmt.string(from: now)
-            today = (try? await store.dailyMetrics(deviceId: deviceId, from: fromDay, to: toDay))?.last
-            if let r = today?.recovery {
+            let allDays = (try? await store.dailyMetrics(deviceId: deviceId, from: fromDay, to: toDay)) ?? []
+            today = allDays.last
+            if let r = allDays.last(where: { $0.recovery != nil })?.recovery {
                 lastKnownRecovery = r
             }
         }
