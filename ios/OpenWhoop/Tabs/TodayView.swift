@@ -152,11 +152,11 @@ struct TodayView: View {
 
     private var strainCoachCard: some View {
         let coach = metrics.strainCoach
-        let current = coach?.currentStrain ?? 0.0
+        let current = metrics.today?.strain ?? coach?.currentStrain ?? 0.0
         let target = coach?.targetStrain
-        let remaining = coach?.remaining
-        let pct = coach?.pctUsed ?? 0.0
-
+        let remaining = target.map { max(0.0, $0 - current) }
+        let pct = target.map { min(100.0, current / $0 * 100.0) } ?? 0.0
+        
         let accentColor: Color = {
             guard pct > 0 else { return WH.Color.textSecondary }
             if pct >= 100 { return WH.Color.recoveryRed }
