@@ -400,12 +400,23 @@ def get_strain_coach(device: str, date: str):
     today = _parse_date(date)
     with psycopg.connect(cfg.db_dsn) as conn:
         today_rows = read.query_daily(conn, device, today, today)
-    recovery = None
-    current_strain = 0.0
-    if today_rows:
-        recovery = today_rows[0].get("recovery")
-    if today_rows:
-        current_strain = float(today_rows[0].get("strain") or 0.0)
+        
+        recovery = None
+        current_strain = 0.0
+        if today_rows:
+            current_strain = float(today_rows[0].get("strain") or 0.0)
+            recovery = today_rows[0].get("recovery")
+        
+        # If today has no recovery yet, look back up to 2 days for the most
+        # recent computed recovery (covers the case where sleep ended "yesterday").
+        if recovery is None:
+            lookback_start = today - _dt.timedelta(days=2)
+            past_rows = read.query_daily(conn, device, lookback_start, today)
+            for row in reversed(past_rows):
+                if row.get("recovery") is not None:
+                    recovery = row["recovery"]
+                    break
+    
     if recovery is None:
         return {"date": date, "recovery": None, "target_strain": None,
                 "current_strain": current_strain, "remaining": None,
