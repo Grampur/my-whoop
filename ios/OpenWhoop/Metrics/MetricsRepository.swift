@@ -126,6 +126,12 @@ final class MetricsRepository: ObservableObject {
                                                     from: windowStart,
                                                     to: windowEnd,
                                                     limit: 50))?.last
+        let coachFmt = DateFormatter()
+        coachFmt.dateFormat = "yyyy-MM-dd"
+        let todayStr = coachFmt.string(from: Date())
+        if let result = await serverSync?.getStrainCoach(date: todayStr), result.status == "ok" {
+            strainCoach = result
+        }
     }
 
     // MARK: - Refresh from server then reload
@@ -144,8 +150,6 @@ final class MetricsRepository: ObservableObject {
         lastRefreshedAt = Date()
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
-        let _ = await fetchStrainCoach(date: fmt.string(from: Date()))
         // Morning recovery notification: fire once per calendar day when recovery is available.
         if let metric = today, let recovery = metric.recovery {
             RecoveryNotifier.notify(recovery: recovery, forDay: metric.day)

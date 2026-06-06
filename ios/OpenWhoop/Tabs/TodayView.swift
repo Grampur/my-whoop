@@ -63,11 +63,7 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 // Strain Coach card
                 strainCoachCard
-                    .task { await metrics.fetchStrainCoach(date: {
-                        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-                        return f.string(from: Date())
-                    }()) }
-
+                
                 // Sleep card → sleep duration history
                 NavigationLink(destination: MetricDetailView(kind: .sleepDuration)) {
                     sleepCard
