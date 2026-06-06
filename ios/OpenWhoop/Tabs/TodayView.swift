@@ -63,7 +63,7 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 // Strain Coach card
                 strainCoachCard
-                
+
                 // Sleep card → sleep duration history
                 NavigationLink(destination: MetricDetailView(kind: .sleepDuration)) {
                     sleepCard
@@ -97,7 +97,7 @@ struct TodayView: View {
         HStack {
             Spacer()
             NavigationLink(destination: MetricDetailView(kind: .recovery)) {
-                if let recovery = metrics.today?.recovery {
+                if let recovery = metrics.lastKnownRecovery {
                     RecoveryRing(percent: recovery * 100, size: 200, strokeWidth: 16)
                 } else {
                     pendingRecoveryRing

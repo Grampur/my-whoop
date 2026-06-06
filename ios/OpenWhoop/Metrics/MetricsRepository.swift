@@ -23,6 +23,7 @@ final class MetricsRepository: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var lastRefreshedAt: Date?
     @Published private(set) var strainCoach: ServerSync.StrainCoach?
+    @Published private(set) var lastKnownRecovery: Double?
 
     // Injected directly (test path): store + sync are ready immediately; skip ensureOpen.
     private var store: WhoopStore?
@@ -117,6 +118,9 @@ final class MetricsRepository: ObservableObject {
             let fromDay = fmt.string(from: start)
             let toDay = fmt.string(from: now)
             today = (try? await store.dailyMetrics(deviceId: deviceId, from: fromDay, to: toDay))?.last
+            if let r = today?.recovery {
+                lastKnownRecovery = r
+            }
         }
 
         // Fetch last 14 days of sleep sessions; take the most-recent (last) row.
