@@ -880,19 +880,8 @@ extension BLEManager: CBPeripheralDelegate {
                     strapNewestTs = newest                        // feeds the liveness watchdog
                 }
                 if frame.count > 6, frame[6] == WhoopCommand.getAlarmTime.rawValue {
-                    if frame.count >= 12 {
-                        let epoch = UInt32(frame[8]) | UInt32(frame[9]) << 8 | UInt32(frame[10]) << 16 | UInt32(frame[11]) << 24
-                        if epoch == 0 {
-                            log("Alarm ACK: strap reports NO alarm armed — SET_ALARM_TIME was rejected")
-                        } else {
-                            let date = Date(timeIntervalSince1970: TimeInterval(epoch))
-                            let fmt = DateFormatter()
-                            fmt.dateStyle = .short; fmt.timeStyle = .short
-                            log("Alarm ACK: strap confirmed \(fmt.string(from: date)) (epoch \(epoch))")
-                        }
-                    } else {
-                        log("Alarm ACK: response too short — frame=\(frame.map { String(format: \"%02x\", $0) }.joined())")
-                    }
+                    let hex = frame.map { String(format: "%02x", $0) }.joined(separator: " ")
+                    log("Alarm raw frame: \(hex)")
                 }
                 // Clock correlation runs in both live and backfill modes. Once established it
                 // unblocks both the Collector (live path) and the Backfiller (chunk decoding).

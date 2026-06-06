@@ -28,7 +28,7 @@ enum WorkoutType: String, CaseIterable, Identifiable {
         case .poker:         return "suit.spade.fill"
         case .weightlifting: return "dumbbell.fill"
         case .cardio:        return "figure.walk"
-        case .stairmaster:   return "staircase"
+        case .stairmaster:   return "figure.stair.stepper"
         case .swimming:      return "figure.pool.swim"
         }
     }
