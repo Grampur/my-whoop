@@ -144,6 +144,7 @@ final class MetricsRepository: ObservableObject {
         lastRefreshedAt = Date()
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
         let _ = await fetchStrainCoach(date: fmt.string(from: Date()))
         // Morning recovery notification: fire once per calendar day when recovery is available.
         if let metric = today, let recovery = metric.recovery {
