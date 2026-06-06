@@ -528,10 +528,10 @@ public final class BLEManager: NSObject, ObservableObject {
         let epochSec = UInt32(date.timeIntervalSince1970)
         // Clear any existing alarm first — some firmware won't overwrite without a disable
         send(.disableAlarm, payload: [0x01])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self else { return }
             self.send(.setClock, payload: BLEManager.setClockPayload())
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
                 self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
                           writeType: .withResponse)
