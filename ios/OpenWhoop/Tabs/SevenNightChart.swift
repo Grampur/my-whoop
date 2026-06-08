@@ -165,7 +165,6 @@ struct SevenNightChart: View {
                 .padding(WH.Spacing.md)
             } else {
                 GanttCanvas(
-                    refreshID: refreshID,
                     rows: rows,
                     xMin: xMin,
                     xMax: xMax,
@@ -173,7 +172,8 @@ struct SevenNightChart: View {
                     labelColumnWidth: labelColumnWidth,
                     rowHeight: rowHeight,
                     barHeight: barHeight,
-                    axisHeight: axisHeight
+                    axisHeight: axisHeight,
+                    refreshID: refreshID
                 )
             }
         }
@@ -229,14 +229,14 @@ private struct GanttCanvas: View {
 
             ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                 NightRowView(
-                    refreshID: refreshID,
                     row: row,
                     index: idx,
                     labelColumnWidth: labelColumnWidth,
                     rowHeight: rowHeight,
                     barHeight: barHeight,
                     trackWidth: trackWidth,
-                    xScale: scale
+                    xScale: scale,
+                    refreshID: refreshID
                 )
             }
 
@@ -275,6 +275,7 @@ private struct NightRowView: View {
     let barHeight:        CGFloat
     let trackWidth:       CGFloat
     let xScale:           (Double) -> CGFloat
+    let refreshID: UUID
 
     @State private var selectedBarIndex: Int? = nil
     private var longestBarIndex: Int { row.bars.firstIndex(where: { $0.isLongest }) ?? 0 }
@@ -359,7 +360,6 @@ private struct AxisTickView: View {
     let labelColumnWidth: CGFloat
     let totalWidth:       CGFloat
     let xScale:           (Double) -> CGFloat
-    let refreshID: UUID
 
     var body: some View {
         let x          = labelColumnWidth + xScale(tick)
