@@ -15,6 +15,7 @@ import WhoopStore
 
 struct SevenNightChart: View {
     let sessions: [CachedSleepSession]
+    let refreshID: UUID
 
     // MARK: - Static formatters
 
@@ -164,6 +165,7 @@ struct SevenNightChart: View {
                 .padding(WH.Spacing.md)
             } else {
                 GanttCanvas(
+                    refreshID: refreshID,
                     rows: rows,
                     xMin: xMin,
                     xMax: xMax,
@@ -193,6 +195,7 @@ private struct GanttCanvas: View {
     let rowHeight:        CGFloat
     let barHeight:        CGFloat
     let axisHeight:       CGFloat
+    let refreshID: UUID
 
     private func axisLabel(hoursFromSixPm: Double) -> String {
         let totalHour = Int(18 + hoursFromSixPm) % 24
@@ -226,6 +229,7 @@ private struct GanttCanvas: View {
 
             ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                 NightRowView(
+                    refreshID: refreshID,
                     row: row,
                     index: idx,
                     labelColumnWidth: labelColumnWidth,
@@ -340,7 +344,7 @@ private struct NightRowView: View {
             }
         }
         // Reset selection whenever the row data changes (pull-to-refresh)
-        .onChange(of: row.bars.map { $0.duration }) { _ in
+        .onChange(of: refreshID) { _ in
             selectedBarIndex = nil
         }
     }
@@ -355,6 +359,7 @@ private struct AxisTickView: View {
     let labelColumnWidth: CGFloat
     let totalWidth:       CGFloat
     let xScale:           (Double) -> CGFloat
+    let refreshID: UUID
 
     var body: some View {
         let x          = labelColumnWidth + xScale(tick)
