@@ -77,9 +77,21 @@ struct SevenNightChart: View {
     }
 
     private func nightLabel(_ session: CachedSleepSession) -> String {
-        SevenNightChart.nightLabelFormatter.string(
-            from: Date(timeIntervalSince1970: TimeInterval(session.endTs))
-        )
+        let cal = Calendar.current
+        let startDate = Date(timeIntervalSince1970: TimeInterval(session.startTs))
+        var comps = cal.dateComponents([.year, .month, .day], from: startDate)
+        comps.hour = 18; comps.minute = 0; comps.second = 0
+        guard let sameDaySixPm = cal.date(from: comps) else {
+            return SevenNightChart.nightLabelFormatter.string(from: startDate)
+        }
+        // If session started before 6 PM, it belongs to the previous night
+        let labelDate: Date
+        if startDate < sameDaySixPm {
+            labelDate = cal.date(byAdding: .day, value: -1, to: startDate) ?? startDate
+        } else {
+            labelDate = startDate
+        }
+        return SevenNightChart.nightLabelFormatter.string(from: labelDate)
     }
 
     private func clockTime(_ epochSeconds: Int) -> String {
@@ -260,7 +272,6 @@ private struct NightRowView: View {
     let trackWidth:       CGFloat
     let xScale:           (Double) -> CGFloat
 
-    // nil = default state (longest bar's labels shown)
     @State private var selectedBarIndex: Int? = nil
 
     var body: some View {
@@ -268,7 +279,6 @@ private struct NightRowView: View {
         let barY   = yTop + (rowHeight - barHeight) / 2
         let labelY = yTop + (rowHeight - 14) / 2
 
-        // Which bar is currently "active" for label display
         let activeIndex: Int = {
             if let sel = selectedBarIndex { return sel }
             return row.bars.firstIndex(where: { $0.isLongest }) ?? 0
@@ -276,27 +286,23 @@ private struct NightRowView: View {
 
         ZStack(alignment: .topLeading) {
 
-            // Day label
             Text(row.label)
                 .font(.system(size: 11, weight: .regular, design: .default))
                 .foregroundStyle(WH.Color.textSecondary)
                 .frame(width: labelColumnWidth, alignment: .leading)
                 .offset(x: 0, y: labelY)
 
-            // Faint full-width track
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(WH.Color.surface2)
                 .frame(width: trackWidth, height: barHeight)
                 .offset(x: labelColumnWidth, y: barY)
 
-            // Bars
             ForEach(Array(row.bars.enumerated()), id: \.offset) { idx, bar in
                 let barX0 = labelColumnWidth + xScale(bar.xStart)
                 let barX1 = labelColumnWidth + xScale(bar.xEnd)
                 let barW  = max(barX1 - barX0, 4)
                 let isActive = idx == activeIndex
 
-                // Sleep bar
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(
                         LinearGradient(
@@ -309,32 +315,31 @@ private struct NightRowView: View {
                     .frame(width: barW, height: barHeight)
                     .offset(x: barX0, y: barY)
                     .onTapGesture {
-                        // Tapping the longest bar is a no-op (it's always default)
                         guard !bar.isLongest else { return }
-                        if selectedBarIndex == idx {
-                            // Tap active nap bar → deselect back to longest
-                            selectedBarIndex = nil
-                        } else {
-                            selectedBarIndex = idx
-                        }
+                        selectedBarIndex = (selectedBarIndex == idx) ? nil : idx
                     }
 
-                // Labels — only shown for the active bar
                 if isActive {
+                    // Bedtime — left of bar
                     Text(bar.bedtime)
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(WH.Color.sleepPurple)
                         .frame(width: 60, alignment: .leading)
                         .offset(x: barX0, y: barY - 12)
 
+                    // Waketime — right of bar, but clamped so it never
+                    // overlaps the bedtime label (min 62pt gap between starts)
+                    let wakeX = max(barX1 - 60, barX0 + 62)
                     Text(bar.waketime)
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(WH.Color.stageLight)
                         .frame(width: 60, alignment: .trailing)
-                        .offset(x: barX1 - 60, y: barY - 12)
+                        .offset(x: wakeX, y: barY - 12)
                 }
             }
         }
+        // Reset selection whenever the row data changes (pull-to-refresh)
+        .id(row.id + String(row.bars.count))
     }
 }
 

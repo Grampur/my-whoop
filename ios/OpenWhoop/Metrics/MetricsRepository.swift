@@ -252,7 +252,14 @@ final class MetricsRepository: ObservableObject {
         var nightOrder: [String] = []
         var nightMap: [String: [CachedSleepSession]] = [:]
         for s in sessions {
-            let label = fmt.string(from: Date(timeIntervalSince1970: TimeInterval(s.endTs)))
+            let startDate = Date(timeIntervalSince1970: TimeInterval(s.startTs))
+            var comps = Calendar.current.dateComponents([.year, .month, .day], from: startDate)
+            comps.hour = 18; comps.minute = 0; comps.second = 0
+            let sameDaySixPm = Calendar.current.date(from: comps) ?? startDate
+            let labelDate = startDate < sameDaySixPm
+                ? (Calendar.current.date(byAdding: .day, value: -1, to: startDate) ?? startDate)
+                : startDate
+            let label = fmt.string(from: labelDate)
             if nightMap[label] == nil {
                 nightOrder.append(label)
                 nightMap[label] = []
