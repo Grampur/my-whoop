@@ -4,13 +4,13 @@ import WhoopStore
 // MARK: - SevenNightChart
 // Gantt-style 7-night sleep/wake timeline.
 //
-// Layout: each night is ONE row — day label (fixed left column) + a bar drawn
-// on a shared time-of-day GeometryReader track + bed/wake clock labels flanking
-// the bar's ends. A single shared axis ruler at the bottom is aligned to the
-// same track width, so every element is pixel-perfectly registered.
+// Layout: each NIGHT is ONE row — day label (fixed left column) + one or more
+// sleep bars drawn on a shared time-of-day track. Multiple sessions on the same
+// calendar night (e.g. an evening nap + main sleep) each get their own bar on
+// the same row. The leftmost bar's bedtime and rightmost bar's wake time are
+// shown as clock labels flanking the row.
 //
 // Time axis: "hours since the 6 PM preceding each night's bedtime."
-// A typical 11 PM → 7 AM session maps to 5.0 → 13.0.
 // One shared [xMin, xMax] domain with small padding covers all nights.
 
 struct SevenNightChart: View {
@@ -34,31 +34,38 @@ struct SevenNightChart: View {
 
     // MARK: - Layout constants
 
-    private let labelColumnWidth: CGFloat = 54   // day-label column
-    private let rowHeight:        CGFloat = 44   // height of each night row
-    private let barHeight:        CGFloat = 14   // the sleep bar itself
-    private let axisHeight:       CGFloat = 28   // bottom axis ruler row
+    private let labelColumnWidth: CGFloat = 54
+    private let rowHeight:        CGFloat = 44
+    private let barHeight:        CGFloat = 14
+    private let axisHeight:       CGFloat = 28
 
     // MARK: - Row model
+    // One per night date; contains ALL sessions for that night as bars.
 
-    struct NightRow: Identifiable {
-        let id: Int          // session.startTs — unique natural key
-        let label: String    // e.g. "Mon 5/26"
-        let bedtime: String  // e.g. "11:42 PM"
-        let waketime: String // e.g. "6:46 AM"
-        let xStart: Double   // hours from reference 6 PM
-        let xEnd:   Double
+    struct SessionBar {
+        let xStart:   Double
+        let xEnd:     Double
+        let bedtime:  String   // shown on the first bar only
+        let waketime: String   // shown on the last bar only
+        let isFirst:  Bool
+        let isLast:   Bool
     }
 
-    // MARK: - Time helpers (same logic as the old implementation, kept intact)
+    struct NightRow: Identifiable {
+        let id:    String        // "EEE M/d" label — unique per night
+        let label: String
+        let bars:  [SessionBar]
+    }
 
-    /// Hours from the most-recent 6 PM that preceded the session's startTs.
+    // MARK: - Time helpers
+
+    /// Hours from the most-recent 18:00 local time before `epochSeconds`.
     private func hoursFromBaseline(_ epochSeconds: Int, referenceSixPm: Date) -> Double {
         let target = Date(timeIntervalSince1970: TimeInterval(epochSeconds))
         return target.timeIntervalSince(referenceSixPm) / 3600
     }
 
-    /// Returns the most-recent 18:00 local time strictly before session.startTs.
+    /// Returns the most-recent 18:00 local time strictly before `session.startTs`.
     private func referenceSixPm(for session: CachedSleepSession) -> Date {
         let cal = Calendar.current
         let startDate = Date(timeIntervalSince1970: TimeInterval(session.startTs))
@@ -71,6 +78,7 @@ struct SevenNightChart: View {
         return sameDaySixPm
     }
 
+    /// Night label derived from the session's END time (the morning it woke up).
     private func nightLabel(_ session: CachedSleepSession) -> String {
         SevenNightChart.nightLabelFormatter.string(
             from: Date(timeIntervalSince1970: TimeInterval(session.endTs))
@@ -83,34 +91,57 @@ struct SevenNightChart: View {
         )
     }
 
+    // MARK: - Grouping: sessions → one NightRow per night
+
+    private func buildNightRows() -> [NightRow] {
+        // Group sessions by their night label (end-date derived "EEE M/d").
+        // Preserve insertion order (sessions arrive oldest→newest by startTs).
+        var groups: [(label: String, sessions: [CachedSleepSession])] = []
+        var labelIndex: [String: Int] = [:]
+
+        for s in sessions {
+            let label = nightLabel(s)
+            if let idx = labelIndex[label] {
+                groups[idx].sessions.append(s)
+            } else {
+                labelIndex[label] = groups.count
+                groups.append((label: label, sessions: [s]))
+            }
+        }
+
+        return groups.map { group in
+            // Sort sessions within a night by start time.
+            let sorted = group.sessions.sorted { $0.startTs < $1.startTs }
+            let bars: [SessionBar] = sorted.enumerated().map { idx, s in
+                let sixPm = referenceSixPm(for: s)
+                return SessionBar(
+                    xStart:   hoursFromBaseline(s.startTs, referenceSixPm: sixPm),
+                    xEnd:     hoursFromBaseline(s.endTs,   referenceSixPm: sixPm),
+                    bedtime:  clockTime(s.startTs),
+                    waketime: clockTime(s.endTs),
+                    isFirst:  idx == 0,
+                    isLast:   idx == sorted.count - 1
+                )
+            }
+            return NightRow(id: group.label, label: group.label, bars: bars)
+        }
+    }
+
     // MARK: - Body
 
     var body: some View {
-        // Build row models
-        let rows: [NightRow] = sessions.map { s in
-            let sixPm = referenceSixPm(for: s)
-            return NightRow(
-                id:       s.startTs,
-                label:    nightLabel(s),
-                bedtime:  clockTime(s.startTs),
-                waketime: clockTime(s.endTs),
-                xStart:   hoursFromBaseline(s.startTs, referenceSixPm: sixPm),
-                xEnd:     hoursFromBaseline(s.endTs,   referenceSixPm: sixPm)
-            )
-        }
+        let rows = buildNightRows()
 
-        // Shared domain across all nights, with padding
-        let allX = rows.flatMap { [$0.xStart, $0.xEnd] }
+        // Shared x-domain across all bars on all nights.
+        let allX = rows.flatMap { $0.bars.flatMap { [$0.xStart, $0.xEnd] } }
         let xMin = (allX.min() ?? 4.0) - 0.5
         let xMax = (allX.max() ?? 14.0) + 0.75
 
-        // Axis ticks at clean clock hours that fall inside the domain
         let candidates: [Double] = [3.0, 6.0, 9.0, 12.0, 15.0, 18.0]
         let axisTicks = candidates.filter { $0 >= xMin && $0 <= xMax }
 
         VStack(alignment: .leading, spacing: 0) {
             if rows.count < 2 {
-                // Graceful fallback for 0-1 nights
                 HStack {
                     Image(systemName: "moon.zzz")
                         .font(.system(size: 18, weight: .light))
@@ -144,8 +175,6 @@ struct SevenNightChart: View {
 }
 
 // MARK: - GanttCanvas
-// The actual positioned drawing — a separate View so GeometryReader's
-// closure gets a proper non-ViewBuilder context for local let-bindings.
 
 private struct GanttCanvas: View {
     let rows:             [SevenNightChart.NightRow]
@@ -157,7 +186,6 @@ private struct GanttCanvas: View {
     let barHeight:        CGFloat
     let axisHeight:       CGFloat
 
-    /// Converts "hours since 18:00" to a short axis label: 3→"9p" 6→"12a" 9→"3a" 12→"6a"
     private func axisLabel(hoursFromSixPm: Double) -> String {
         let totalHour = Int(18 + hoursFromSixPm) % 24
         let isPm      = totalHour >= 12
@@ -172,13 +200,11 @@ private struct GanttCanvas: View {
         .frame(height: CGFloat(rows.count) * rowHeight + axisHeight)
     }
 
-    // Extracted so we can use local `let` freely (plain function, not ViewBuilder)
     @ViewBuilder
     private func canvasContent(totalWidth: CGFloat) -> some View {
-        let trackWidth = totalWidth - labelColumnWidth
+        let trackWidth  = totalWidth - labelColumnWidth
         let totalHeight = CGFloat(rows.count) * rowHeight + axisHeight
 
-        // Helper: domain value → track-pixel offset
         let scale = { (v: Double) -> CGFloat in
             CGFloat((v - xMin) / (xMax - xMin)) * trackWidth
         }
@@ -209,7 +235,6 @@ private struct GanttCanvas: View {
             // ── Axis ruler ────────────────────────────────────────────────
             let axisY = CGFloat(rows.count) * rowHeight
 
-            // Top hairline spanning the track
             Rectangle()
                 .fill(WH.Color.separator)
                 .frame(width: trackWidth, height: 1)
@@ -226,14 +251,14 @@ private struct GanttCanvas: View {
                 )
             }
 
-            // Invisible spacer so the ZStack is fully tall
             Color.clear.frame(width: totalWidth, height: totalHeight)
         }
     }
 }
 
 // MARK: - NightRowView
-// One Gantt row: day label + faint track + sleep bar + bed/wake time labels.
+// One Gantt row: day label + faint track + ONE OR MORE sleep bars.
+// The first bar shows the bedtime label; the last bar shows the wake label.
 
 private struct NightRowView: View {
     let row:              SevenNightChart.NightRow
@@ -247,59 +272,65 @@ private struct NightRowView: View {
     var body: some View {
         let yTop   = CGFloat(index) * rowHeight
         let barY   = yTop + (rowHeight - barHeight) / 2
-        let barX0  = labelColumnWidth + xScale(row.xStart)
-        let barX1  = labelColumnWidth + xScale(row.xEnd)
-        let barW   = max(barX1 - barX0, 4)
-        // Vertical centre for the day label (single line, ~14 pt cap height)
         let labelY = yTop + (rowHeight - 14) / 2
 
         ZStack(alignment: .topLeading) {
 
-            // Day label
+            // Day label (left column)
             Text(row.label)
                 .font(.system(size: 11, weight: .regular, design: .default))
                 .foregroundStyle(WH.Color.textSecondary)
                 .frame(width: labelColumnWidth, alignment: .leading)
                 .offset(x: 0, y: labelY)
 
-            // Full-width faint track (shows the full possible span)
+            // Full-width faint track
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(WH.Color.surface2)
                 .frame(width: trackWidth, height: barHeight)
                 .offset(x: labelColumnWidth, y: barY)
 
-            // Sleep bar
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [WH.Color.sleepPurple, WH.Color.stageLight],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            // One bar + optional time labels per session
+            ForEach(Array(row.bars.enumerated()), id: \.offset) { _, bar in
+                let barX0 = labelColumnWidth + xScale(bar.xStart)
+                let barX1 = labelColumnWidth + xScale(bar.xEnd)
+                let barW  = max(barX1 - barX0, 4)
+
+                // Sleep bar — slightly more transparent for naps (non-last bars)
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [WH.Color.sleepPurple, WH.Color.stageLight],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                )
-                .frame(width: barW, height: barHeight)
-                .offset(x: barX0, y: barY)
+                    .opacity(bar.isLast ? 1.0 : 0.55)
+                    .frame(width: barW, height: barHeight)
+                    .offset(x: barX0, y: barY)
 
-            // Bedtime label — just above the bar's left end
-            Text(row.bedtime)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(WH.Color.sleepPurple)
-                .frame(width: 60, alignment: .leading)
-                .offset(x: barX0, y: barY - 12)
+                // Bedtime — only on the first (leftmost) bar
+                if bar.isFirst {
+                    Text(bar.bedtime)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(WH.Color.sleepPurple)
+                        .frame(width: 60, alignment: .leading)
+                        .offset(x: barX0, y: barY - 12)
+                }
 
-            // Wake label — just above the bar's right end, right-aligned so it
-            // doesn't overshoot the card edge when the bar ends near the right
-            Text(row.waketime)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(WH.Color.stageLight)
-                .frame(width: 60, alignment: .trailing)
-                .offset(x: barX1 - 60, y: barY - 12)
+                // Wake time — only on the last (rightmost) bar
+                if bar.isLast {
+                    Text(bar.waketime)
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(WH.Color.stageLight)
+                        .frame(width: 60, alignment: .trailing)
+                        .offset(x: barX1 - 60, y: barY - 12)
+                }
+            }
         }
     }
 }
 
 // MARK: - AxisTickView
-// One axis tick mark + label. Clamps near the right edge to avoid clipping.
 
 private struct AxisTickView: View {
     let tick:             Double
@@ -312,17 +343,14 @@ private struct AxisTickView: View {
     var body: some View {
         let x          = labelColumnWidth + xScale(tick)
         let labelWidth: CGFloat = 28
-        // Clamp so the rightmost label stays inside the card
         let clampedX   = min(x, totalWidth - labelWidth / 2)
 
         ZStack(alignment: .topLeading) {
-            // Tick mark
             Rectangle()
                 .fill(WH.Color.separator)
                 .frame(width: 1, height: 5)
                 .offset(x: x, y: axisY + 1)
 
-            // Tick label
             Text(label)
                 .font(.system(size: 9, weight: .regular, design: .monospaced))
                 .foregroundStyle(WH.Color.textSecondary)
