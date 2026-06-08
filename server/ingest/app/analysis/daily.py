@@ -68,6 +68,7 @@ import logging
 import math
 import statistics
 from typing import Any
+import numpy as np
 
 from .. import read, store
 from . import exercise as _exercise
@@ -79,6 +80,7 @@ from . import units as _units
 from . import baselines as _baselines
 from ._utils import to_epoch
 from . import sleep_need as _sleep_need
+from scipy.interpolate import interp1d
 
 _log = logging.getLogger(__name__)
 
@@ -290,12 +292,23 @@ def _nightly_signals(
             out["skin_temp_dev_c"] = round(dev, 2)
 
     # Respiratory rate — Welch-peak over the night's resp waveform.
-    resp_rows = _in_night(streams.get("resp") or [])
-    resp_sig = [float(r["raw"]) for r in resp_rows if r.get("raw") is not None]
-    if len(resp_sig) >= 2:
-        rr = _units.resp_rate_from_signal(resp_sig)
-        out["resp_rate_bpm"] = round(rr, 1) if rr is not None else None
-
+    rr_rows = _in_night(streams.get("rr") or [])
+    if len(rr_rows) >= 2:
+        # Reconstruct true beat times by cumulating RR intervals
+        rr_ms = np.array([float(r["rr_ms"]) for r in rr_rows], dtype=float)
+        rr_ms = rr_ms[(rr_ms >= 600) & (rr_ms <= 1400)]  # reject artifacts
+        if len(rr_ms) >= 2:
+            rr_s = rr_ms / 1000.0
+            beat_times = np.concatenate([[0.0], np.cumsum(rr_s)])
+            # Interpolate onto uniform 4 Hz grid
+            fs = 4.0
+            t_uniform = np.arange(beat_times[0], beat_times[-1], 1.0 / fs)
+            if len(t_uniform) >= 2:
+                interp = interp1d(beat_times[:-1], rr_ms, kind="linear",
+                                bounds_error=False, fill_value="extrapolate")
+                rr_signal = interp(t_uniform)
+                rr = _units.resp_rate_from_signal(rr_signal, fs=fs, nperseg=int(fs * 120))
+                out["resp_rate_bpm"] = round(rr, 1) if rr is not None else None
     return out
 
 
@@ -399,7 +412,14 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
             stages=merged_stages or None)
         nightly_rmssd = hrv_res.get("rmssd")
         if nightly_rmssd is not None and math.isfinite(nightly_rmssd):
-            avg_hrv = nightly_rmssd
+            # Sanity check: only accept nightly_hrv if it's within 40% of the
+            # sleep session value. Large divergence = artifact-corrupted RR data;
+            # fall back to the sleep session value in that case.
+            session_hrv = sleep_summary["avg_hrv"]
+            if session_hrv is None or abs(nightly_rmssd - session_hrv) / max(session_hrv, 1.0) <= 0.40:
+                avg_hrv = nightly_rmssd
+            else:
+                avg_hrv = session_hrv  # fall back to sleep session value
 
     # ── Recovery (needs the night's resp, sleep_perf, + a personal baseline) ──
     night_resp = None
@@ -460,7 +480,10 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
         profile=device_profile)
 
     # ── Calibrated nightly signals (APPROXIMATE; over the sleep window) ───────
-    signals = _nightly_signals(conn, device_id, day, streams, night_start, night_end)
+    main_session = max(night_sessions, key=lambda s: s.end - s.start) if night_sessions else None
+    main_sleep_start = main_session.start if main_session else night_start
+    main_sleep_end = main_session.end if main_session else night_end
+    signals = _nightly_signals(conn, device_id, day, streams, main_sleep_start, main_sleep_end)
 
     metrics_sleep_min = sleep_summary.get("total_sleep_min")
 

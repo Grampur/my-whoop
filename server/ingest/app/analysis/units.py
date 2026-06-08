@@ -433,12 +433,22 @@ def resp_rate_from_signal(
 def _resp_rate_welch(arr: np.ndarray, *, fs: float = 1.0,
                      nperseg: int = _RESP_NPERSEG_DEFAULT) -> Optional[float]:
     """Welch periodogram peak in 0.1–0.5 Hz → BrPM.  Primary path."""
-    # Guard: NaN in input → all-NaN PSD → argmax silently returns index 0 → 6.0 BrPM floor
     if not np.all(np.isfinite(arr)):
         return None
     arr_detrended = arr - np.mean(arr)
     if np.all(arr_detrended == 0):
         return None
+
+    # Bandpass filter to respiratory band before Welch to remove slow HRV drift
+    from scipy.signal import butter, filtfilt
+    nyq = fs / 2.0
+    lo = max(_RESP_BAND_LO / nyq, 0.01)
+    hi = min(_RESP_BAND_HI / nyq, 0.99)
+    try:
+        b, a = butter(3, [lo, hi], btype="band")
+        arr_detrended = filtfilt(b, a, arr_detrended)
+    except Exception:
+        pass  # fall through to unfiltered Welch
 
     nperseg_actual = min(nperseg, len(arr))
     try:

@@ -30,7 +30,7 @@ Current staging uses a multi-signal pipeline: Cole-Kripke sleep/wake detection f
 - **Recovery** — Baseline-normalized weighted composite (HRV, RHR, sleep performance, respiratory). Physiologically reasonable, not validated against WHOOP ground truth.
 - **SpO2** — Uncalibrated. See above.
 - **Skin temp** — Uncalibrated. See above.
-- **Respiratory rate** — Welch spectral estimator, approximate.
+- **Respiratory rate** — RSA-derived from RR intervals (bandpass filtered, interpolated to 4 Hz uniform grid, Welch spectral peak in 0.15–0.4 Hz band). Accurate on clean uninterrupted main sleep; degrades when sleep detector includes long awake periods within the session.
 
 ## Branch Notes
 - `main` — production, deployed via Docker
