@@ -273,6 +273,7 @@ private struct NightRowView: View {
     let xScale:           (Double) -> CGFloat
 
     @State private var selectedBarIndex: Int? = nil
+    private var longestBarIndex: Int { row.bars.firstIndex(where: { $0.isLongest }) ?? 0 }
 
     var body: some View {
         let yTop   = CGFloat(index) * rowHeight
@@ -339,7 +340,9 @@ private struct NightRowView: View {
             }
         }
         // Reset selection whenever the row data changes (pull-to-refresh)
-        .id(row.id + String(row.bars.count))
+        .onChange(of: row.bars.map { $0.duration }) { _ in
+            selectedBarIndex = nil
+        }
     }
 }
 
