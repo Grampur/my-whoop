@@ -16,6 +16,7 @@ struct SleepView: View {
     @State private var detail: (session: CachedSleepSession, daily: DailyMetric?)?
     @State private var weekNights: [CachedSleepSession] = []
     @State private var showingAlarm = false
+    @State private var chartRefreshID = UUID()
 
     // Alarm state read from UserDefaults for the summary card.
     @AppStorage(AlarmKeys.enabled)    private var alarmEnabled   = false
@@ -67,6 +68,7 @@ struct SleepView: View {
         await metrics.refresh()
         detail = await metrics.sleepDetail()
         weekNights = await metrics.sevenNightSleepWake(nights: 7)
+        chartRefreshID = UUID()
     }
 
     // MARK: - Loading
@@ -392,7 +394,7 @@ struct SleepView: View {
             if weekNights.count < 1 {
                 noDataCard(icon: "chart.bar.xaxis", message: "Need more nights to show the trend")
             } else {
-                SevenNightChart(sessions: weekNights)
+                SevenNightChart(sessions: weekNights, refreshID: chartRefreshID)
 
                 if weekNights.count < 2 {
                     Text("Collect more nights for a full trend view")
