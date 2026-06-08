@@ -237,14 +237,32 @@ final class MetricsRepository: ObservableObject {
         guard let store else { return [] }
 
         let now = Int(Date().timeIntervalSince1970)
-        let windowStart = now - (nights + 2) * 86_400
+        let windowStart = now - (nights + 5) * 86_400
         let windowEnd   = now + 86_400
         let sessions = (try? await store.sleepSessions(deviceId: deviceId,
-                                                       from: windowStart,
-                                                       to: windowEnd,
-                                                       limit: nights + 2)) ?? []
-        // sleepSessions returns ASC by startTs; take the last `nights` (most-recent), keep ASC order.
-        return Array(sessions.suffix(nights))
+                                                    from: windowStart,
+                                                    to: windowEnd,
+                                                    limit: nights * 4)) ?? []
+
+        // Group by night label to count distinct nights (some nights have multiple
+        // sessions), take the last `nights` nights, then flatten back to all sessions.
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEE M/d"
+
+        var nightOrder: [String] = []
+        var nightMap: [String: [CachedSleepSession]] = [:]
+        for s in sessions {
+            let label = fmt.string(from: Date(timeIntervalSince1970: TimeInterval(s.endTs)))
+            if nightMap[label] == nil {
+                nightOrder.append(label)
+                nightMap[label] = []
+            }
+            nightMap[label]!.append(s)
+        }
+
+        return nightOrder.suffix(nights)
+            .flatMap { nightMap[$0]! }
+            .sorted { $0.startTs < $1.startTs }
     }
 
     // MARK: - Raw HR series (downsampled stream, for Trends card + HeartRateDetailView)

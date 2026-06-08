@@ -4,19 +4,19 @@ import WhoopStore
 // MARK: - SevenNightChart
 // Gantt-style 7-night sleep/wake timeline.
 //
-// Layout: each NIGHT is ONE row — day label (fixed left column) + one or more
-// sleep bars drawn on a shared time-of-day track. Multiple sessions on the same
-// calendar night (e.g. an evening nap + main sleep) each get their own bar on
-// the same row. The leftmost bar's bedtime and rightmost bar's wake time are
-// shown as clock labels flanking the row.
+// Layout: each NIGHT is ONE row. Multiple sessions on the same night (naps +
+// main sleep) each get their own bar on the same row.
 //
-// Time axis: "hours since the 6 PM preceding each night's bedtime."
-// One shared [xMin, xMax] domain with small padding covers all nights.
+// Default label state: only the LONGEST bar's start and end times are shown
+// (that's the main sleep). Tapping any other bar selects it — the longest
+// bar's labels hide and that bar's start/end appear instead. Tapping the
+// selected bar again (or it being the longest) resets to default.
+// Selection is ephemeral — resets on next data load.
 
 struct SevenNightChart: View {
     let sessions: [CachedSleepSession]
 
-    // MARK: - Static formatters (allocated once, never in body)
+    // MARK: - Static formatters
 
     private static let nightLabelFormatter: DateFormatter = {
         let fmt = DateFormatter()
@@ -39,33 +39,31 @@ struct SevenNightChart: View {
     private let barHeight:        CGFloat = 14
     private let axisHeight:       CGFloat = 28
 
-    // MARK: - Row model
-    // One per night date; contains ALL sessions for that night as bars.
+    // MARK: - Models
 
     struct SessionBar {
+        let index:    Int       // position within the night's bars
         let xStart:   Double
         let xEnd:     Double
-        let bedtime:  String   // shown on the first bar only
-        let waketime: String   // shown on the last bar only
-        let isFirst:  Bool
-        let isLast:   Bool
+        let bedtime:  String
+        let waketime: String
+        let duration: Double    // seconds — used to find the longest bar
+        let isLongest: Bool
     }
 
     struct NightRow: Identifiable {
-        let id:    String        // "EEE M/d" label — unique per night
+        let id:    String
         let label: String
         let bars:  [SessionBar]
     }
 
     // MARK: - Time helpers
 
-    /// Hours from the most-recent 18:00 local time before `epochSeconds`.
     private func hoursFromBaseline(_ epochSeconds: Int, referenceSixPm: Date) -> Double {
         let target = Date(timeIntervalSince1970: TimeInterval(epochSeconds))
         return target.timeIntervalSince(referenceSixPm) / 3600
     }
 
-    /// Returns the most-recent 18:00 local time strictly before `session.startTs`.
     private func referenceSixPm(for session: CachedSleepSession) -> Date {
         let cal = Calendar.current
         let startDate = Date(timeIntervalSince1970: TimeInterval(session.startTs))
@@ -78,7 +76,6 @@ struct SevenNightChart: View {
         return sameDaySixPm
     }
 
-    /// Night label derived from the session's END time (the morning it woke up).
     private func nightLabel(_ session: CachedSleepSession) -> String {
         SevenNightChart.nightLabelFormatter.string(
             from: Date(timeIntervalSince1970: TimeInterval(session.endTs))
@@ -91,11 +88,9 @@ struct SevenNightChart: View {
         )
     }
 
-    // MARK: - Grouping: sessions → one NightRow per night
+    // MARK: - Grouping
 
     private func buildNightRows() -> [NightRow] {
-        // Group sessions by their night label (end-date derived "EEE M/d").
-        // Preserve insertion order (sessions arrive oldest→newest by startTs).
         var groups: [(label: String, sessions: [CachedSleepSession])] = []
         var labelIndex: [String: Int] = [:]
 
@@ -110,17 +105,21 @@ struct SevenNightChart: View {
         }
 
         return groups.map { group in
-            // Sort sessions within a night by start time.
             let sorted = group.sessions.sorted { $0.startTs < $1.startTs }
+            let durations = sorted.map { Double($0.endTs - $0.startTs) }
+            let maxDuration = durations.max() ?? 0
+
             let bars: [SessionBar] = sorted.enumerated().map { idx, s in
-                let sixPm = referenceSixPm(for: s)
+                let sixPm    = referenceSixPm(for: s)
+                let duration = Double(s.endTs - s.startTs)
                 return SessionBar(
-                    xStart:   hoursFromBaseline(s.startTs, referenceSixPm: sixPm),
-                    xEnd:     hoursFromBaseline(s.endTs,   referenceSixPm: sixPm),
-                    bedtime:  clockTime(s.startTs),
-                    waketime: clockTime(s.endTs),
-                    isFirst:  idx == 0,
-                    isLast:   idx == sorted.count - 1
+                    index:     idx,
+                    xStart:    hoursFromBaseline(s.startTs, referenceSixPm: sixPm),
+                    xEnd:      hoursFromBaseline(s.endTs,   referenceSixPm: sixPm),
+                    bedtime:   clockTime(s.startTs),
+                    waketime:  clockTime(s.endTs),
+                    duration:  duration,
+                    isLongest: duration == maxDuration
                 )
             }
             return NightRow(id: group.label, label: group.label, bars: bars)
@@ -131,12 +130,9 @@ struct SevenNightChart: View {
 
     var body: some View {
         let rows = buildNightRows()
-
-        // Shared x-domain across all bars on all nights.
         let allX = rows.flatMap { $0.bars.flatMap { [$0.xStart, $0.xEnd] } }
         let xMin = (allX.min() ?? 4.0) - 0.5
         let xMax = (allX.max() ?? 14.0) + 0.75
-
         let candidates: [Double] = [3.0, 6.0, 9.0, 12.0, 15.0, 18.0]
         let axisTicks = candidates.filter { $0 >= xMin && $0 <= xMax }
 
@@ -204,14 +200,11 @@ private struct GanttCanvas: View {
     private func canvasContent(totalWidth: CGFloat) -> some View {
         let trackWidth  = totalWidth - labelColumnWidth
         let totalHeight = CGFloat(rows.count) * rowHeight + axisHeight
-
         let scale = { (v: Double) -> CGFloat in
             CGFloat((v - xMin) / (xMax - xMin)) * trackWidth
         }
 
         ZStack(alignment: .topLeading) {
-
-            // ── Background gridlines ──────────────────────────────────────
             ForEach(axisTicks, id: \.self) { tick in
                 Rectangle()
                     .fill(WH.Color.separator.opacity(0.4))
@@ -219,7 +212,6 @@ private struct GanttCanvas: View {
                     .offset(x: labelColumnWidth + scale(tick), y: 0)
             }
 
-            // ── Night rows ────────────────────────────────────────────────
             ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
                 NightRowView(
                     row: row,
@@ -232,9 +224,7 @@ private struct GanttCanvas: View {
                 )
             }
 
-            // ── Axis ruler ────────────────────────────────────────────────
             let axisY = CGFloat(rows.count) * rowHeight
-
             Rectangle()
                 .fill(WH.Color.separator)
                 .frame(width: trackWidth, height: 1)
@@ -257,8 +247,9 @@ private struct GanttCanvas: View {
 }
 
 // MARK: - NightRowView
-// One Gantt row: day label + faint track + ONE OR MORE sleep bars.
-// The first bar shows the bedtime label; the last bar shows the wake label.
+// Manages its own selected bar index. nil = default (show longest bar's labels).
+// Tapping the longest bar is a no-op. Tapping any other bar selects it;
+// tapping the already-selected bar deselects back to default.
 
 private struct NightRowView: View {
     let row:              SevenNightChart.NightRow
@@ -269,33 +260,43 @@ private struct NightRowView: View {
     let trackWidth:       CGFloat
     let xScale:           (Double) -> CGFloat
 
+    // nil = default state (longest bar's labels shown)
+    @State private var selectedBarIndex: Int? = nil
+
     var body: some View {
         let yTop   = CGFloat(index) * rowHeight
         let barY   = yTop + (rowHeight - barHeight) / 2
         let labelY = yTop + (rowHeight - 14) / 2
 
+        // Which bar is currently "active" for label display
+        let activeIndex: Int = {
+            if let sel = selectedBarIndex { return sel }
+            return row.bars.firstIndex(where: { $0.isLongest }) ?? 0
+        }()
+
         ZStack(alignment: .topLeading) {
 
-            // Day label (left column)
+            // Day label
             Text(row.label)
                 .font(.system(size: 11, weight: .regular, design: .default))
                 .foregroundStyle(WH.Color.textSecondary)
                 .frame(width: labelColumnWidth, alignment: .leading)
                 .offset(x: 0, y: labelY)
 
-            // Full-width faint track
+            // Faint full-width track
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(WH.Color.surface2)
                 .frame(width: trackWidth, height: barHeight)
                 .offset(x: labelColumnWidth, y: barY)
 
-            // One bar + optional time labels per session
-            ForEach(Array(row.bars.enumerated()), id: \.offset) { _, bar in
+            // Bars
+            ForEach(Array(row.bars.enumerated()), id: \.offset) { idx, bar in
                 let barX0 = labelColumnWidth + xScale(bar.xStart)
                 let barX1 = labelColumnWidth + xScale(bar.xEnd)
                 let barW  = max(barX1 - barX0, 4)
+                let isActive = idx == activeIndex
 
-                // Sleep bar — slightly more transparent for naps (non-last bars)
+                // Sleep bar
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(
                         LinearGradient(
@@ -304,21 +305,28 @@ private struct NightRowView: View {
                             endPoint: .trailing
                         )
                     )
-                    .opacity(bar.isLast ? 1.0 : 0.55)
+                    .opacity(bar.isLongest ? 1.0 : 0.55)
                     .frame(width: barW, height: barHeight)
                     .offset(x: barX0, y: barY)
+                    .onTapGesture {
+                        // Tapping the longest bar is a no-op (it's always default)
+                        guard !bar.isLongest else { return }
+                        if selectedBarIndex == idx {
+                            // Tap active nap bar → deselect back to longest
+                            selectedBarIndex = nil
+                        } else {
+                            selectedBarIndex = idx
+                        }
+                    }
 
-                // Bedtime — only on the first (leftmost) bar
-                if bar.isFirst {
+                // Labels — only shown for the active bar
+                if isActive {
                     Text(bar.bedtime)
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(WH.Color.sleepPurple)
                         .frame(width: 60, alignment: .leading)
                         .offset(x: barX0, y: barY - 12)
-                }
 
-                // Wake time — only on the last (rightmost) bar
-                if bar.isLast {
                     Text(bar.waketime)
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(WH.Color.stageLight)
