@@ -338,6 +338,104 @@ def delete_workout(start_ts: float, device: str):
         raise HTTPException(status_code=404, detail="workout not found")
     return {"status": "deleted"}
 
+# ── Manual workout entry ───────────────────────────────────────────────────────
+
+class ManualWorkout(BaseModel):
+    device: str
+    start_ts: float   # unix epoch seconds
+    end_ts: float     # unix epoch seconds
+    kind: str | None = None  # e.g. "weightlifting", "cardio"
+
+@app.post("/v1/manual-workout", dependencies=[Depends(require_auth)])
+def manual_workout(body: ManualWorkout):
+    """Log a workout retroactively by time window. Pulls HR + gravity from DB,
+    runs exercise detection over the window (bypassing the motion gate by treating
+    the full window as one session), stores the result, and returns the workout row."""
+    from app.analysis import exercise as _exercise, strain as _strain
+    from app.analysis.strain import estimate_hrmax
+
+    start, end = int(body.start_ts), int(body.end_ts)
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end_ts must be after start_ts")
+    if (end - start) > 86400:
+        raise HTTPException(status_code=400, detail="window cannot exceed 24 hours")
+
+    with psycopg.connect(cfg.db_dsn) as conn:
+        # Pull streams for the window
+        from app.analysis.daily import to_epoch
+        hr_rows      = read.query_stream(conn, "hr",      body.device, start, end, limit=200_000)
+        gravity_rows = read.query_stream(conn, "gravity", body.device, start, end, limit=200_000)
+        for r in hr_rows:      r["ts"] = to_epoch(r["ts"])
+        for r in gravity_rows: r["ts"] = to_epoch(r["ts"])
+        profile      = read.query_profile(conn, body.device)
+        resting_hr   = None
+
+        # Try to get today's resting HR from daily metrics for a better floor
+        import datetime as _dt
+        day = _dt.date.fromtimestamp(start)
+        daily = read.query_daily(conn, body.device, day, day)
+        if daily:
+            resting_hr = daily[0].get("resting_hr")
+
+        # Get max_hr from profile if stored
+        max_hr = profile.get("max_hr") if profile else None
+
+        streams = {"hr": hr_rows, "gravity": gravity_rows}
+
+        # Run standard detection first
+        sessions = _exercise.detect_exercises(
+            streams,
+            resting_hr=float(resting_hr) if resting_hr else None,
+            max_hr=float(max_hr) if max_hr else None,
+            profile=profile,
+        )
+
+        # If detection found nothing (motion gate killed it — e.g. leg day),
+        # force the full window as a single session
+        if not sessions and hr_rows:
+            hr_vals = [r["bpm"] for r in hr_rows if r.get("bpm")]
+            if hr_vals:
+                avg_hr  = sum(hr_vals) / len(hr_vals)
+                peak_hr = max(hr_vals)
+                dur_s   = end - start
+                rhr     = float(resting_hr) if resting_hr else _strain.DEFAULT_RESTING_HR
+                hr_vals_for_max = [r["bpm"] for r in hr_rows if r.get("bpm")]
+                if max_hr:
+                    eff_max = float(max_hr)
+                    hrmax_source = "profile"
+                else:
+                    eff_max, hrmax_source = _strain.estimate_hrmax(
+                        hr_vals_for_max, age=profile.get("age") if profile else None)
+                strain_val = _strain.strain(hr_rows, max_hr=eff_max, resting_hr=rhr)
+                zones, hrr_pct = _exercise._bout_intensity(hr_rows, resting_hr=rhr, max_hr=eff_max)
+                sessions = [{
+                    "start":         start,
+                    "end":           end,
+                    "avg_hr":        round(avg_hr, 2),
+                    "peak_hr":       peak_hr,
+                    "strain":        round(strain_val, 2) if strain_val else None,
+                    "kind":          body.kind,
+                    "duration_s":    dur_s,
+                    "zone_time_pct": {str(z): pct for z, pct in zones.items()},
+                    "avg_hrr_pct":   hrr_pct,
+                    "hrmax":         eff_max,
+                    "hrmax_source":  hrmax_source,
+                    "calories_kcal": None,
+                    "calories_kj":   None,
+                }]
+        else:
+            # Tag all detected sessions with the provided kind
+            for s in sessions:
+                if body.kind:
+                    s["kind"] = body.kind
+
+        if not sessions:
+            raise HTTPException(status_code=422, detail="No HR data found for that window")
+
+        store.upsert_exercise_sessions(conn, body.device, sessions)
+        conn.commit()
+
+    return sessions
 
 # ── Backfill workouts endpoint ────────────────────────────────────────────────
 
