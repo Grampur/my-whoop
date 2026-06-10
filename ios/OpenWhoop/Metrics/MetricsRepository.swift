@@ -137,7 +137,27 @@ final class MetricsRepository: ObservableObject {
             let todaySessions = allSleepSessions.filter {
                 abs(TimeInterval($0.endTs) - lastEnd) < 12 * 3600
             }
-            lastNightTotalMin = todaySessions.reduce(0.0) { $0 + Double($1.endTs - $1.startTs) / 60.0 }
+            // Use server-computed total_sleep_min from the daily row for accuracy
+            let sleepDate = Calendar.current.date(from: Calendar.current.dateComponents(
+                [.year, .month, .day],
+                from: Date(timeIntervalSince1970: lastEnd)
+            ))!
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            let sleepDateStr = fmt.string(from: sleepDate)
+            let fmt2 = DateFormatter()
+            fmt2.dateFormat = "yyyy-MM-dd"
+            fmt2.timeZone = TimeZone(identifier: "UTC")
+            let sleepDateStr = fmt2.string(from: Date(timeIntervalSince1970: lastEnd))
+
+            let cachedDaily = try? await store.dailyMetrics(deviceId: deviceId,
+                                                            from: sleepDateStr,
+                                                            to: sleepDateStr)
+            if let totalMin = cachedDaily?.first?.totalSleepMin, totalMin > 0 {
+                lastNightTotalMin = totalMin
+            } else {
+                lastNightTotalMin = todaySessions.reduce(0.0) { $0 + Double($1.endTs - $1.startTs) / 60.0 }
+            }
         } else {
             lastNightTotalMin = nil
         }
