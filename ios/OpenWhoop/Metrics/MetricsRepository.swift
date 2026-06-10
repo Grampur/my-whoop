@@ -133,12 +133,14 @@ final class MetricsRepository: ObservableObject {
                                                                to: windowEnd,
                                                                limit: 50)) ?? []
         lastNight = allSleepSessions.last
-        let todaySessions = allSleepSessions.filter {
-            Calendar.current.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.endTs)))
-                || Calendar.current.isDateInYesterday(Date(timeIntervalSince1970: TimeInterval($0.endTs)))
+        if let lastEnd = allSleepSessions.last.map({ TimeInterval($0.endTs) }) {
+            let todaySessions = allSleepSessions.filter {
+                abs(TimeInterval($0.endTs) - lastEnd) < 12 * 3600
+            }
+            lastNightTotalMin = todaySessions.reduce(0.0) { $0 + Double($1.endTs - $1.startTs) / 60.0 }
+        } else {
+            lastNightTotalMin = nil
         }
-        lastNightTotalMin = todaySessions.isEmpty ? nil :
-            todaySessions.reduce(0.0) { $0 + Double($1.endTs - $1.startTs) / 60.0 }
         let coachFmt = DateFormatter()
         coachFmt.dateFormat = "yyyy-MM-dd"
         let todayStr = coachFmt.string(from: Date())
