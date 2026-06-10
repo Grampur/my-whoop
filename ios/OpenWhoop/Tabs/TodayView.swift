@@ -192,6 +192,7 @@ struct TodayView: View {
     private var sleepCard: some View {
         let sleepMin: Double? = {
             if let m = metrics.today?.totalSleepMin, m > 0 { return m }
+            if let m = metrics.lastNightTotalMin, m > 0 { return m }
             if let s = metrics.lastNight {
                 let d = Double(s.endTs - s.startTs) / 60
                 return d > 0 ? d : nil

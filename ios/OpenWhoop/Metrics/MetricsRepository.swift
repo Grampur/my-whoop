@@ -19,6 +19,7 @@ import WhoopStore
 final class MetricsRepository: ObservableObject {
     @Published private(set) var today: DailyMetric?            // most-recent cached daily row
     @Published private(set) var lastNight: CachedSleepSession? // most-recent cached sleep session
+    @Published private(set) var lastNightTotalMin: Double?
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
     @Published private(set) var lastRefreshedAt: Date?
@@ -127,10 +128,17 @@ final class MetricsRepository: ObservableObject {
         // Fetch last 14 days of sleep sessions; take the most-recent (last) row.
         let windowStart = Int(now.timeIntervalSince1970) - 14 * 86_400
         let windowEnd   = Int(now.timeIntervalSince1970) + 86_400   // +1 day buffer
-        lastNight = (try? await store.sleepSessions(deviceId: deviceId,
-                                                    from: windowStart,
-                                                    to: windowEnd,
-                                                    limit: 50))?.last
+        let allSleepSessions = (try? await store.sleepSessions(deviceId: deviceId,
+                                                               from: windowStart,
+                                                               to: windowEnd,
+                                                               limit: 50)) ?? []
+        lastNight = allSleepSessions.last
+        let todaySessions = allSleepSessions.filter {
+            Calendar.current.isDateInToday(Date(timeIntervalSince1970: TimeInterval($0.endTs)))
+                || Calendar.current.isDateInYesterday(Date(timeIntervalSince1970: TimeInterval($0.endTs)))
+        }
+        lastNightTotalMin = todaySessions.isEmpty ? nil :
+            todaySessions.reduce(0.0) { $0 + Double($1.endTs - $1.startTs) / 60.0 }
         let coachFmt = DateFormatter()
         coachFmt.dateFormat = "yyyy-MM-dd"
         let todayStr = coachFmt.string(from: Date())
