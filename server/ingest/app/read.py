@@ -208,7 +208,7 @@ def counts(conn, device_id, start, end):
 
 # ── Profile reads ─────────────────────────────────────────────────────────────
 
-_PROFILE_COLS = ["device_id", "height_cm", "weight_kg", "age", "sex", "updated_at"]
+_PROFILE_COLS = ("device_id", "height_cm", "weight_kg", "age", "sex", "max_hr", "updated_at")
 
 
 def query_profile(conn, device_id: str) -> dict | None:

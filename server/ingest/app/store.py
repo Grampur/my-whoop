@@ -189,20 +189,22 @@ def upsert_sleep_sessions(conn: psycopg.Connection, device_id: str, sessions) ->
 
 def upsert_profile(conn: psycopg.Connection, device_id: str,
                    height_cm: float | None, weight_kg: float | None,
-                   age: int | None, sex: str | None) -> None:
+                   age: int | None, sex: str | None,
+                   max_hr: int | None = None) -> None:
     """Upsert the user profile row for ``device_id``. All biometric fields are
     optional (None keeps the existing value via the DO UPDATE). ``sex`` must be
     one of ``"male"``, ``"female"``, ``"nonbinary"`` or ``None``."""
     conn.execute(
-        """INSERT INTO profile (device_id, height_cm, weight_kg, age, sex, updated_at)
-           VALUES (%s, %s, %s, %s, %s, now())
+        """INSERT INTO profile (device_id, height_cm, weight_kg, age, sex, max_hr, updated_at)
+           VALUES (%s, %s, %s, %s, %s, %s, now())
            ON CONFLICT (device_id) DO UPDATE SET
              height_cm  = EXCLUDED.height_cm,
              weight_kg  = EXCLUDED.weight_kg,
              age        = EXCLUDED.age,
              sex        = EXCLUDED.sex,
+             max_hr     = EXCLUDED.max_hr,
              updated_at = now()""",
-        (device_id, height_cm, weight_kg, age, sex),
+        (device_id, height_cm, weight_kg, age, sex, max_hr),
     )
 
 
