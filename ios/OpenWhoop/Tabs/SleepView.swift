@@ -143,8 +143,8 @@ struct SleepView: View {
         let daily = detail?.daily
 
         let efficiencyPct: Int? = {
-            if let e = session?.efficiency, e > 0 { return Int((e * 100).rounded()) }
             if let e = daily?.efficiency, e > 0 { return Int((e * 100).rounded()) }
+            if let e = session?.efficiency, e > 0 { return Int((e * 100).rounded()) }
             return nil
         }()
 
@@ -319,16 +319,16 @@ struct SleepView: View {
 
                 MetricCard(
                     title: "Resting HR",
-                    value: session?.restingHr.map { "\($0)" } ?? "—",
-                    unit: session?.restingHr != nil ? "bpm" : nil,
-                    accentColor: session?.restingHr != nil ? WH.Color.textPrimary : WH.Color.textSecondary
+                    value: (daily?.restingHr ?? session?.restingHr).map { "\($0)" } ?? "—",
+                    unit: (daily?.restingHr ?? session?.restingHr) != nil ? "bpm" : nil,
+                    accentColor: (daily?.restingHr ?? session?.restingHr) != nil ? WH.Color.textPrimary : WH.Color.textSecondary
                 )
 
                 MetricCard(
                     title: "HRV",
-                    value: session?.avgHrv.map { String(format: "%.0f", $0) } ?? "—",
-                    unit: session?.avgHrv != nil ? "ms" : nil,
-                    accentColor: session?.avgHrv != nil ? WH.Color.recoveryGreen : WH.Color.textSecondary
+                    value: (daily?.avgHrv ?? session?.avgHrv).map { String(format: "%.0f", $0) } ?? "—",
+                    unit: (daily?.avgHrv ?? session?.avgHrv) != nil ? "ms" : nil,
+                    accentColor: (daily?.avgHrv ?? session?.avgHrv) != nil ? WH.Color.recoveryGreen : WH.Color.textSecondary
                 )
 
                 MetricCard(

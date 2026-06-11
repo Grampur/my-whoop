@@ -114,14 +114,15 @@ _SKIN_TEMP_BASELINE_LIMIT = 3_000_000
 _LOCAL_TZ = _dt.timezone(_dt.timedelta(hours=-7))   # PDT (summer); change to -8 in winter
 
 def _day_bounds_utc(day: _dt.date) -> tuple[float, float]:
-    """Day [18:00 previous day, 18:00 day) local time — matches WHOOP's 6pm boundary."""
-    start = _dt.datetime.combine(day, _dt.time(18, 0), _LOCAL_TZ) - _dt.timedelta(days=1)
-    end   = _dt.datetime.combine(day, _dt.time(18, 0), _LOCAL_TZ)
+    """Day [12:00 previous day, 12:00 day) local time — noon-to-noon cycle.
+    Any sleep after noon counts toward the next day's recovery."""
+    start = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ) - _dt.timedelta(days=1)
+    end   = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ)
     return start.timestamp(), end.timestamp()
 
 def _window_bounds_utc(day: _dt.date) -> tuple[float, float]:
     """Sleep-aware read window starting 30h before day boundary."""
-    lead = _dt.datetime.combine(day, _dt.time(18, 0), _LOCAL_TZ) - _dt.timedelta(hours=30)
+    lead = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ) - _dt.timedelta(hours=30)
     _, day_end = _day_bounds_utc(day)
     return lead.timestamp(), day_end
 
