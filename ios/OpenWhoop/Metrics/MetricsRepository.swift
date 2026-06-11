@@ -115,9 +115,10 @@ final class MetricsRepository: ObservableObject {
         fmt.dateFormat = "yyyy-MM-dd"
 
         // Fetch last 14 days of daily metrics; take the most-recent (last) row.
-        if let start = cal.date(byAdding: .day, value: -14, to: now) {
-            let fromDay = fmt.string(from: start)
-            let toDay = fmt.string(from: now)
+        if let start = cal.date(byAdding: .day, value: -14, to: now),
+            let end = cal.date(byAdding: .day, value: 1, to: now) {
+                let fromDay = fmt.string(from: start)
+                let toDay = fmt.string(from: end)
             let allDays = (try? await store.dailyMetrics(deviceId: deviceId, from: fromDay, to: toDay)) ?? []
             today = allDays.last
             if let r = allDays.last(where: { $0.recovery != nil })?.recovery {
@@ -238,7 +239,7 @@ final class MetricsRepository: ObservableObject {
                                                    limit: 50)) ?? []
         // "Last night" = most recent session that started before noon local time.
         // Sessions starting after noon are naps/rest periods that belong to the next night's recovery.
-        guard let session = allSessions.last(where: {
+        guard let session = allSessions.first(where: {
             let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
             return hour < 12
         }) else { return nil }
