@@ -170,7 +170,7 @@ extension WhoopStore {
                         avgHr = excluded.avgHr,
                         peakHr = excluded.peakHr,
                         strain = excluded.strain,
-                        kind = excluded.kind,
+                        kind = COALESCE(excluded.kind, workoutSession.kind),
                         durationS = excluded.durationS,
                         zoneTimePctJSON = excluded.zoneTimePctJSON,
                         avgHrrPct = excluded.avgHrrPct,
