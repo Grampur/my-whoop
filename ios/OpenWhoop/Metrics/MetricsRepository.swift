@@ -400,16 +400,17 @@ final class MetricsRepository: ObservableObject {
         await ensureOpen()
         guard let store else { return false }
 
-        // Write locally first — works offline, instant feedback
+        // These two writes MUST complete before we return — if the app is killed
+        // after this function returns, both writes are already committed to SQLite.
         try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
-
-        // Enqueue to pending BEFORE attempting the server PATCH — if the app is killed
-        // between the local write and the PATCH, the queue entry survives and drains
-        // on next launch. On success the queue entry is removed by tagWorkout in ServerSync.
         try? await store.enqueuePendingTag(deviceId: deviceId, startTs: startTs, kind: kind)
 
-        // Best-effort server sync; on success ServerSync.tagWorkout removes the queue entry
-        let _ = await serverSync?.tagWorkout(startTs: startTs, kind: kind)
+        // Fire server PATCH in a detached task — we don't await it.
+        // ServerSync.tagWorkout removes the queue entry on success.
+        Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            let _ = await self.serverSync?.tagWorkout(startTs: startTs, kind: kind)
+        }
         return true
     }
 
