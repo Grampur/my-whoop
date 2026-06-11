@@ -335,10 +335,21 @@ final class ServerSync {
         }
 
         // /v1/sleep is per-date; fetch ONLY the days that appear in /v1/daily (days with computed
-        // metrics) rather than every calendar day in the window. Idempotent upserts.
+        // metrics) rather than every calendar day in the window.
+        // DELETE stale sessions for each day first so locally-cached sessions that the server
+        // no longer returns (e.g. naps detected on a prior sync) don't linger.
+        let dayFmt = DateFormatter()
+        dayFmt.dateFormat = "yyyy-MM-dd"
+        dayFmt.timeZone = TimeZone(identifier: "UTC")
         for metric in days {
-            if let sessions = await getSleep(date: metric.day), !sessions.isEmpty {
-                try? await store.upsertSleepSessions(sessions, deviceId: deviceId)
+            if let sessions = await getSleep(date: metric.day) {
+                if let dayStart = dayFmt.date(from: metric.day).map({ Int($0.timeIntervalSince1970) }) {
+                    let dayEnd = dayStart + 86_400
+                    try? await store.deleteSleepSessions(deviceId: deviceId, from: dayStart, to: dayEnd)
+                }
+                if !sessions.isEmpty {
+                    try? await store.upsertSleepSessions(sessions, deviceId: deviceId)
+                }
             }
         }
 

@@ -322,6 +322,20 @@ extension WhoopStore {
         }
     }
 
+    /// Delete cached sleep sessions whose startTs falls in [fromTs, toTs] (epoch seconds).
+    /// Call before upserting a fresh server response so stale locally-cached sessions
+    /// (e.g. naps detected on a prior sync) don't linger in the database.
+    @discardableResult
+    public func deleteSleepSessions(deviceId: String, from fromTs: Int, to toTs: Int) async throws -> Int {
+        try syncWrite { db in
+            try db.execute(sql: """
+                DELETE FROM sleepSession
+                WHERE deviceId = ? AND startTs >= ? AND startTs <= ?
+                """, arguments: [deviceId, fromTs, toTs])
+            return db.changesCount
+        }
+    }
+
     /// Delete all cached workout bouts for [fromTs, toTs] (epoch seconds, by startTs).
     /// Used before upserting a fresh server response so stale rows from a server recompute
     /// don't persist alongside the new set.
