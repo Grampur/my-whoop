@@ -132,7 +132,10 @@ final class MetricsRepository: ObservableObject {
                                                                from: windowStart,
                                                                to: windowEnd,
                                                                limit: 50)) ?? []
-        lastNight = allSleepSessions.last
+        lastNight = allSleepSessions.last(where: {
+            let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
+            return hour < 12
+        })
         if let lastEnd = allSleepSessions.last.map({ TimeInterval($0.endTs) }) {
             let todaySessions = allSleepSessions.filter {
                 abs(TimeInterval($0.endTs) - lastEnd) < 12 * 3600
@@ -229,11 +232,16 @@ final class MetricsRepository: ObservableObject {
         let now = Int(Date().timeIntervalSince1970)
         let windowStart = now - 14 * 86_400
         let windowEnd   = now + 86_400
-        guard let session = (try? await store.sleepSessions(deviceId: deviceId,
-                                                            from: windowStart,
-                                                            to: windowEnd,
-                                                            limit: 50))?.last else { return nil }
-
+        let allSessions = (try? await store.sleepSessions(deviceId: deviceId,
+                                                   from: windowStart,
+                                                   to: windowEnd,
+                                                   limit: 50)) ?? []
+        // "Last night" = most recent session that started before noon local time.
+        // Sessions starting after noon are naps/rest periods that belong to the next night's recovery.
+        guard let session = allSessions.last(where: {
+            let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
+            return hour < 12
+        }) else { return nil }
         // Derive the YYYY-MM-DD day that the session's endTs falls on (UTC).
         let fmt = DateFormatter()
         fmt.calendar = Calendar(identifier: .gregorian)
