@@ -135,7 +135,7 @@ final class MetricsRepository: ObservableObject {
                                                                limit: 50)) ?? []
         lastNight = allSleepSessions.last(where: {
             let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
-            return hour < 12
+            return hour < 6
         })
         if let lastEnd = allSleepSessions.last.map({ TimeInterval($0.endTs) }) {
             let todaySessions = allSleepSessions.filter {
@@ -239,9 +239,9 @@ final class MetricsRepository: ObservableObject {
                                                    limit: 50)) ?? []
         // "Last night" = most recent session that started before noon local time.
         // Sessions starting after noon are naps/rest periods that belong to the next night's recovery.
-        guard let session = allSessions.first(where: {
+        guard let session = allSessions.last(where: {
             let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
-            return hour < 12
+            return hour < 6
         }) else { return nil }
         // Derive the YYYY-MM-DD day that the session's endTs falls on (UTC).
         let fmt = DateFormatter()
