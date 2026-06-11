@@ -137,7 +137,7 @@ final class MetricsRepository: ObservableObject {
             let hour = Calendar.current.component(.hour, from: Date(timeIntervalSince1970: TimeInterval($0.startTs)))
             return hour < 6
         })
-        if let lastEnd = allSleepSessions.last.map({ TimeInterval($0.endTs) }) {
+        if let lastEnd = lastNight.map({ TimeInterval($0.endTs) }) {
             let todaySessions = allSleepSessions.filter {
                 abs(TimeInterval($0.endTs) - lastEnd) < 12 * 3600
             }
