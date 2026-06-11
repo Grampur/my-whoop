@@ -403,7 +403,12 @@ final class MetricsRepository: ObservableObject {
         // Write locally first — works offline, instant feedback
         try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
 
-        // Best-effort server sync; failure is silent (local write already done)
+        // Enqueue to pending BEFORE attempting the server PATCH — if the app is killed
+        // between the local write and the PATCH, the queue entry survives and drains
+        // on next launch. On success the queue entry is removed by tagWorkout in ServerSync.
+        try? await store.enqueuePendingTag(deviceId: deviceId, startTs: startTs, kind: kind)
+
+        // Best-effort server sync; on success ServerSync.tagWorkout removes the queue entry
         let _ = await serverSync?.tagWorkout(startTs: startTs, kind: kind)
         return true
     }
