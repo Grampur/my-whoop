@@ -114,14 +114,20 @@ _SKIN_TEMP_BASELINE_LIMIT = 3_000_000
 _LOCAL_TZ = _dt.timezone(_dt.timedelta(hours=-7))   # PDT (summer); change to -8 in winter
 
 def _day_bounds_utc(day: _dt.date) -> tuple[float, float]:
-    """Day [12:00 previous day, 12:00 day) local time — noon-to-noon cycle.
-    Any sleep after noon counts toward the next day's recovery."""
+    """Day boundary for strain/exercise: 6pm previous day → 6pm today (local)."""
+    start = _dt.datetime.combine(day, _dt.time(18, 0), _LOCAL_TZ) - _dt.timedelta(days=1)
+    end   = _dt.datetime.combine(day, _dt.time(18, 0), _LOCAL_TZ)
+    return start.timestamp(), end.timestamp()
+
+def _sleep_bounds_utc(day: _dt.date) -> tuple[float, float]:
+    """Sleep attribution window: noon previous day → noon today (local).
+    Any sleep starting after noon counts toward the next day's recovery."""
     start = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ) - _dt.timedelta(days=1)
     end   = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ)
     return start.timestamp(), end.timestamp()
 
 def _window_bounds_utc(day: _dt.date) -> tuple[float, float]:
-    """Sleep-aware read window starting 30h before day boundary."""
+    """Read window: starts 30h before the sleep boundary to capture full overnight."""
     lead = _dt.datetime.combine(day, _dt.time(12, 0), _LOCAL_TZ) - _dt.timedelta(hours=30)
     _, day_end = _day_bounds_utc(day)
     return lead.timestamp(), day_end
@@ -379,7 +385,8 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
     resting_hr = sleep_summary["resting_hr"]
 
     # Sessions whose END falls on `day` are the night we attribute to this day.
-    night_sessions = [s for s in sessions if _sleep._end_date_utc(s) == day]
+    sleep_start, sleep_end = _sleep_bounds_utc(day)
+    night_sessions = [s for s in sessions if sleep_start <= s.start < sleep_end]
 
     # ── Empty-day skip ───────────────────────────────────────────────────────
     # No sleep night ending on `day` AND no HR/gravity samples in the calendar day
