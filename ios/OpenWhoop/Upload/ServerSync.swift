@@ -361,20 +361,26 @@ final class ServerSync {
         let wFromTs = fmt.date(from: fromDay).map { Int($0.timeIntervalSince1970) } ?? 0
         let wToTs   = fmt.date(from: toDay).map   { Int($0.timeIntervalSince1970) + 86_399 }
                     ?? Int(Date().timeIntervalSince1970)
+
+        // Snapshot pending tags BEFORE the delete — use pending queue, not cached rows,
+        // so we don't accidentally re-apply a server null over a local label.
+        let pendingTagMap: [Int: String?] = (try? await store.pendingTags(deviceId: deviceId))?
+            .reduce(into: [:]) { $0[$1.startTs] = $1.kind } ?? [:]
+
         if !cachedWorkouts.isEmpty {
-            // Preserve any locally-tagged kinds before the delete wipes them
-            let taggedKinds = (try? await store.workoutKinds(deviceId: deviceId, from: wFromTs, to: wToTs)) ?? [:]
             try? await store.deleteWorkouts(deviceId: deviceId, from: wFromTs, to: wToTs)
             try? await store.upsertWorkouts(cachedWorkouts, deviceId: deviceId)
             // Re-apply local tags for any row the server returned NULL for
-            for (startTs, kind) in taggedKinds {
+            for (startTs, kind) in pendingTagMap {
                 try? await store.updateWorkoutKind(deviceId: deviceId, startTs: startTs, kind: kind)
             }
-            // Re-apply local deletes in case server re-upserted a workout we deleted offline.
-            if let stillPending = try? await store.pendingDeletes(deviceId: deviceId) {
-                for startTs in stillPending {
-                    try? await store.deleteWorkouts(deviceId: deviceId, from: startTs, to: startTs)
-                }
+        }
+
+        // Re-apply pending deletes OUTSIDE the isEmpty guard — a workout deleted offline
+        // must stay gone even if the server returns an empty list this sync.
+        if let stillPending = try? await store.pendingDeletes(deviceId: deviceId) {
+            for startTs in stillPending {
+                try? await store.deleteWorkouts(deviceId: deviceId, from: startTs, to: startTs)
             }
         }
     }
