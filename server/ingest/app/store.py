@@ -242,3 +242,12 @@ def upsert_exercise_sessions(conn: psycopg.Connection, device_id: str, sessions)
                  (json.dumps(zt) if zt is not None else None),
                  s.get("avg_hrr_pct"), s.get("hrmax"), s.get("hrmax_source"),
                  s.get("calories_kcal"), s.get("calories_kj")))
+
+
+def query_sleep_overrides(conn: psycopg.Connection, device_id: str) -> dict[float, float]:
+    """Return {session_start_epoch: override_end_epoch} for all manual sleep overrides."""
+    rows = conn.execute(
+        "SELECT session_start, end_ts FROM sleep_overrides WHERE device_id = %s",
+        (device_id,)
+    ).fetchall()
+    return {float(r[0]): float(r[1]) for r in rows}

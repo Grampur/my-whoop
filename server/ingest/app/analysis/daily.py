@@ -381,6 +381,26 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
 
     # ── Sleep (over the sleep-aware window) ──────────────────────────────────
     sessions = _sleep.detect_sleep(streams)
+
+    # ── Manual sleep overrides (e.g. firmware phantom-wake corrections) ───────
+    _overrides = store.query_sleep_overrides(conn, device_id)
+    if _overrides:
+        _patched = []
+        for _s in sessions:
+            _pin = _overrides.get(float(_s.start))
+            if _pin is not None and _pin < _s.end:
+                _trimmed = [seg for seg in _s.stages if seg.start < _pin]
+                _in_bed = _pin - _s.start
+                _asleep = sum(seg.end - seg.start for seg in _trimmed
+                              if seg.stage != "wake")
+                _eff = (_asleep / _in_bed) if _in_bed > 0 else _s.efficiency
+                _s = _sleep.SleepSession(
+                    start=_s.start, end=_pin,
+                    efficiency=_eff, stages=_trimmed,
+                    resting_hr=_s.resting_hr, avg_hrv=_s.avg_hrv)
+            _patched.append(_s)
+        sessions = _patched
+    
     sleep_summary = _sleep.daily_sleep_summary(sessions, day)
     resting_hr = sleep_summary["resting_hr"]
 

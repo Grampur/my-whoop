@@ -6,12 +6,15 @@ import SwiftUI
 
 struct WorkoutsView: View {
     @EnvironmentObject private var metrics: MetricsRepository
+    @EnvironmentObject private var live: LiveViewModel
 
     // MARK: - State
 
     @State private var workouts: [Workout] = []
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
+    @State private var showingManualEntry = false
+    @State private var showingRecorder = false
 
     // MARK: - Body
 
@@ -28,6 +31,15 @@ struct WorkoutsView: View {
             }
             // Hide the system nav bar on the root; pushed detail views manage their own bars.
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingManualEntry) {
+                ManualWorkoutView(onWorkoutLogged: { await reload() })
+                    .environmentObject(metrics)
+            }
+            .sheet(isPresented: $showingRecorder) {
+                WorkoutRecorderView(onWorkoutLogged: { await reload() })
+                    .environmentObject(metrics)
+                    .environmentObject(live)
+            }
         }
         .preferredColorScheme(.dark)
         .task {
@@ -56,7 +68,28 @@ struct WorkoutsView: View {
     private var listContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
-                ScreenHeader("Workouts")
+                HStack(alignment: .center) {
+                    ScreenHeader("Workouts")
+                    Spacer()
+                    Menu {
+                        Button {
+                            showingRecorder = true
+                        } label: {
+                            Label("Live Timer", systemImage: "record.circle")
+                        }
+                        Button {
+                            showingManualEntry = true
+                        } label: {
+                            Label("Log Past Workout", systemImage: "clock.arrow.circlepath")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22, weight: .medium))
+                            .foregroundStyle(WH.Color.strainBlue)
+                    }
+                    .padding(.trailing, WH.Spacing.md)
+                    .padding(.top, WH.Spacing.md)
+                }
 
                 if let err = errorMessage {
                     errorBanner(err)

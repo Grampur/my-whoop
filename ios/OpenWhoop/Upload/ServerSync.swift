@@ -738,6 +738,19 @@ final class ServerSync {
         }
     }
 
+    // MARK: - Manual workout
+    /// POST /v1/manual-workout — logs a retroactive or just-completed workout.
+    /// Returns true on 2xx (the server computed + stored the row).
+    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?) async -> Bool {
+        var body: [String: Any] = [
+            "device": deviceId,
+            "start_ts": startTs,
+            "end_ts": endTs,
+        ]
+        if let kind { body["kind"] = kind }
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return false }
+        return await post(path: "/v1/manual-workout", body: bodyData)
+    }
 
     // MARK: - HTTP helpers
 

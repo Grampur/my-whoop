@@ -434,4 +434,15 @@ final class MetricsRepository: ObservableObject {
         }
         return true
     }
+
+    // MARK: - Manual workout entry
+    /// POSTs a manual workout window to the server, then refreshes the local workout cache.
+    /// Returns true if the server accepted it.
+    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?) async -> Bool {
+        await ensureOpen()
+        guard let sync = serverSync else { return false }
+        let ok = await sync.logManualWorkout(startTs: startTs, endTs: endTs, kind: kind)
+        if ok { await sync.pull() }
+        return ok
+    }
 }
