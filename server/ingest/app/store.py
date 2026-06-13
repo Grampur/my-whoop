@@ -159,12 +159,6 @@ def delete_sessions_for_day(conn: psycopg.Connection, device_id: str, day) -> No
             "DELETE FROM sleep_sessions "
             "WHERE device_id = %s AND (end_ts AT TIME ZONE 'UTC')::date = %s",
             (device_id, day))
-        cur.execute(
-            "DELETE FROM exercise_sessions "
-            "WHERE device_id = %s "
-            "AND start_ts >= %s::date AT TIME ZONE 'UTC' "
-            "AND start_ts <  (%s::date + INTERVAL '1 day') AT TIME ZONE 'UTC'",
-            (device_id, day, day))
 
 
 def upsert_sleep_sessions(conn: psycopg.Connection, device_id: str, sessions) -> None:

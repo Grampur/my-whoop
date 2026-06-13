@@ -91,6 +91,19 @@ struct WorkoutsView: View {
                     .padding(.top, WH.Spacing.md)
                 }
 
+                // Temporary banner — remove when auto-detection is re-enabled
+                HStack(spacing: WH.Spacing.sm) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WH.Color.recoveryYellow)
+                    Text("Auto-detection disabled — log workouts manually")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(WH.Color.recoveryYellow)
+                    Spacer()
+                }
+                .padding(.horizontal, WH.Spacing.md)
+                .padding(.vertical, WH.Spacing.sm)
+
                 if let err = errorMessage {
                     errorBanner(err)
                         .padding(.horizontal, WH.Spacing.md)
