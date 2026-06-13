@@ -96,7 +96,7 @@ struct WorkoutsView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(WH.Color.recoveryYellow)
-                    Text("Auto-detection disabled — log workouts manually")
+                    Text("Auto-detection for workouts disabled, log workouts manually")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(WH.Color.recoveryYellow)
                     Spacer()

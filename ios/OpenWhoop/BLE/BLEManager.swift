@@ -524,21 +524,24 @@ public final class BLEManager: NSObject, ObservableObject {
     ///
     /// On-device verification needed: confirm the strap ACKs SET_ALARM_TIME and that the
     /// alarm persists across BLE disconnect (cannot be verified in the simulator).
-    func armStrapAlarm(at date: Date) {
+    func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3) {
         let epochSec = UInt32(date.timeIntervalSince1970)
-        // Clear any existing alarm first — some firmware won't overwrite without a disable
         send(.disableAlarm, payload: [0x01])
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self else { return }
             self.send(.setClock, payload: BLEManager.setClockPayload())
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
-                self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
-                          writeType: .withResponse)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.send(.getAlarmTime, payload: [0x01])
+                self.send(.runHapticsPattern, payload: [patternId, loops, 0, 0, 0])
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    guard let self else { return }
+                    self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
+                            writeType: .withResponse)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.send(.getAlarmTime, payload: [0x01])
+                    }
+                    self.log("Alarm: armed for \(date) (epoch \(epochSec), pattern=\(patternId), loops=\(loops)) — awaiting strap ACK")
                 }
-                self.log("Alarm: armed for \(date) (epoch \(epochSec)) — awaiting strap ACK")
             }
         }
     }
@@ -880,9 +883,9 @@ extension BLEManager: CBPeripheralDelegate {
                     strapNewestTs = newest                        // feeds the liveness watchdog
                 }
                 if frame.count > 6, frame[6] == WhoopCommand.getAlarmTime.rawValue {
-                    if frame.count >= 15 {
-                        let epoch = UInt32(frame[11]) | UInt32(frame[12]) << 8 | UInt32(frame[13]) << 16 | UInt32(frame[14]) << 24
-                        if epoch == 0 {
+                    if frame.count >= 11 {
+                        let epoch = UInt32(frame[7]) | UInt32(frame[8]) << 8 | UInt32(frame[9]) << 16 | UInt32(frame[10]) << 24
+                        if epoch < 1_000_000_000 {
                             log("Alarm ACK: strap reports no alarm armed")
                         } else {
                             let date = Date(timeIntervalSince1970: TimeInterval(epoch))

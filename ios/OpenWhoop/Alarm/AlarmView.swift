@@ -21,6 +21,8 @@ enum AlarmKeys {
     static let smartWakeLeadMin = "alarmSmartWakeLeadMin"
     /// Epoch seconds of the last successfully armed firmware alarm, for the status line.
     static let armedEpoch       = "alarmArmedEpoch"
+    static let patternId  = "alarmPatternId"
+    static let loopCount  = "alarmLoopCount"
 }
 
 // MARK: - AlarmView
@@ -41,6 +43,9 @@ struct AlarmView: View {
     @AppStorage(AlarmKeys.smartWakeLeadMin) private var smartWakeLeadMin = 20
     @AppStorage(AlarmKeys.armedEpoch)       private var armedEpoch: Double = 0
 
+    @AppStorage(AlarmKeys.patternId)  private var patternId: Int = 2
+    @AppStorage(AlarmKeys.loopCount)  private var loopCount: Int = 3
+
     // Transient state for the DatePicker binding
     @State private var wakeByDate: Date = AlarmView.todayAt(hour: 7, minute: 0)
 
@@ -50,6 +55,7 @@ struct AlarmView: View {
                 WH.Color.background.ignoresSafeArea()
                 Form {
                     alarmTimeSection
+                    hapticSection
                     smartWakeSection
                     enableSection
                     statusSection
@@ -92,6 +98,24 @@ struct AlarmView: View {
             .listRowBackground(WH.Color.surface)
         } header: {
             sectionHeader("Wake-by Time")
+        }
+    }
+
+    private var hapticSection: some View {
+        Section {
+            Picker("Pattern", selection: $patternId) {
+                ForEach(1...7, id: \.self) { i in
+                    Text("Pattern \(i)").tag(i)
+                }
+            }
+            .foregroundStyle(WH.Color.textPrimary)
+            .listRowBackground(WH.Color.surface)
+
+            Stepper("Loops: \(loopCount)", value: $loopCount, in: 1...10)
+                .foregroundStyle(WH.Color.textPrimary)
+                .listRowBackground(WH.Color.surface)
+        } header: {
+            sectionHeader("Alarm Haptic")
         }
     }
 
@@ -238,7 +262,7 @@ struct AlarmView: View {
         let fireDate = nextOccurrence(hour: wakeByHour, minute: wakeByMinute)
         alarmEnabled = true
         armedEpoch   = fireDate.timeIntervalSince1970
-        live.armStrapAlarm(at: fireDate)
+        live.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount))
         // SmartAlarmController disabled — uses enterHighFreqSync which breaks
         // data pipeline on this firmware. Fixed-time firmware alarm is the path.
     }
