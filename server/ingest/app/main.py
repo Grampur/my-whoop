@@ -335,7 +335,7 @@ def delete_workout(start_ts: float, device: str):
     """Delete a workout bout by start_ts. Returns 200 if deleted, 404 if not found."""
     with psycopg.connect(cfg.db_dsn) as conn:
         result = conn.execute(
-            "DELETE FROM exercise_sessions "
+            "UPDATE exercise_sessions SET manually_deleted = TRUE "
             "WHERE device_id = %s AND ABS(EXTRACT(EPOCH FROM start_ts) - %s) < 2 "
             "RETURNING start_ts",
             (device, start_ts)

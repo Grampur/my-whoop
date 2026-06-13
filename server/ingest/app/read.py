@@ -271,6 +271,7 @@ def query_workouts(conn, device_id, start_date, end_date):
         "WHERE device_id = %s "
         "AND (start_ts AT TIME ZONE 'UTC')::date >= %s "
         "AND (start_ts AT TIME ZONE 'UTC')::date <= %s "
+        "AND (manually_deleted IS NULL OR manually_deleted = FALSE) "
         "ORDER BY start_ts",
         (device_id, start_date, end_date),
     ).fetchall()

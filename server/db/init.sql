@@ -151,6 +151,8 @@ ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS hrmax_source  TEXT;
 ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS calories_kcal REAL;
 ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS calories_kj   REAL;
 
+ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS manually_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- User profile (height/weight/age/sex) used for calorie estimation.
 -- One row per device; upserted via POST /v1/profile.
 CREATE TABLE IF NOT EXISTS profile (
