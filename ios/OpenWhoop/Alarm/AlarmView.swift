@@ -261,8 +261,11 @@ struct AlarmView: View {
     private func setAlarm() {
         let fireDate = nextOccurrence(hour: wakeByHour, minute: wakeByMinute)
         alarmEnabled = true
-        armedEpoch   = fireDate.timeIntervalSince1970
-        live.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount))
+        // Don't write armedEpoch yet — wait for the strap to confirm via the ACK callback.
+        // This prevents the status line from showing "Alarm set" when the strap rejected it.
+        live.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount)) { [self] confirmedDate in
+            armedEpoch = confirmedDate.timeIntervalSince1970
+        }
         // SmartAlarmController disabled — uses enterHighFreqSync which breaks
         // data pipeline on this firmware. Fixed-time firmware alarm is the path.
     }

@@ -284,6 +284,9 @@ struct MetricChart: View {
             Text(mediumDateLabel(point.date))
                 .font(.system(size: 10, weight: .regular))
                 .foregroundStyle(WH.Color.textSecondary)
+            Text(Self.timeFmt.string(from: point.date))
+                .font(.system(size: 10, weight: .regular))
+                .foregroundStyle(WH.Color.textSecondary)
         }
         .padding(.horizontal, WH.Spacing.sm)
         .padding(.vertical, WH.Spacing.xs)
@@ -324,6 +327,9 @@ struct MetricChart: View {
     }()
     private static let monthFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM"; return f
+    }()
+    private static let timeFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "h:mm a"; f.timeZone = TimeZone.current; return f
     }()
 
     private func shortDateLabel(_ date: Date) -> String { Self.shortFmt.string(from: date) }

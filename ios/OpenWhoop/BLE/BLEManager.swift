@@ -524,8 +524,13 @@ public final class BLEManager: NSObject, ObservableObject {
     ///
     /// On-device verification needed: confirm the strap ACKs SET_ALARM_TIME and that the
     /// alarm persists across BLE disconnect (cannot be verified in the simulator).
-    func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3) {
+    func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3,
+                       onConfirmed: ((Date) -> Void)? = nil) {
         let epochSec = UInt32(date.timeIntervalSince1970)
+        // Store haptic config so the ACK handler can pass it back to the caller.
+        pendingAlarmPatternId = patternId
+        pendingAlarmLoops     = loops
+        pendingAlarmOnConfirmed = onConfirmed
         send(.disableAlarm, payload: [0x01])
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self else { return }
@@ -534,13 +539,22 @@ public final class BLEManager: NSObject, ObservableObject {
                 guard let self else { return }
                 self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
                         writeType: .withResponse)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                // 2 s gives the strap time to commit the alarm before we read it back.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     self?.send(.getAlarmTime, payload: [0x01])
                 }
-                self.log("Alarm: armed for \(date) (epoch \(epochSec), pattern=\(patternId), loops=\(loops)) — awaiting strap ACK")
+                let fmt = DateFormatter()
+                fmt.dateStyle = .short; fmt.timeStyle = .short
+                fmt.timeZone = TimeZone.current
+                self.log("Alarm: armed for \(fmt.string(from: date)) (epoch \(epochSec), pattern=\(patternId), loops=\(loops)) — awaiting strap ACK")
             }
         }
     }
+
+    // Pending alarm config, used by the GET_ALARM_TIME ACK handler.
+    private var pendingAlarmPatternId: UInt8 = 2
+    private var pendingAlarmLoops: UInt8 = 3
+    private var pendingAlarmOnConfirmed: ((Date) -> Void)?
 
 
 
@@ -569,9 +583,9 @@ public final class BLEManager: NSObject, ObservableObject {
     ///
     /// Haptic firing cannot be verified in the simulator (no strap motor). Test on-device only.
     func testAlarmBuzz() {
-        send(.runHapticsPattern, payload: [2, 3, 0, 0, 0])  // patternId=2, 3 loops
+        send(.runHapticsPattern, payload: [pendingAlarmPatternId, pendingAlarmLoops, 0, 0, 0])
         send(.runAlarm, payload: [0x01])
-        log("Alarm: test buzz fired (patternId=2, runAlarm)")
+        log("Alarm: test buzz fired (patternId=\(pendingAlarmPatternId), loops=\(pendingAlarmLoops), runAlarm)")
     }
 
     /// Parse a standard BLE Heart Rate Measurement (0x2A37) via the pure StandardHeartRate parser.
@@ -887,7 +901,12 @@ extension BLEManager: CBPeripheralDelegate {
                             let date = Date(timeIntervalSince1970: TimeInterval(epoch))
                             let fmt = DateFormatter()
                             fmt.dateStyle = .short; fmt.timeStyle = .short
+                            fmt.timeZone = TimeZone.current 
                             log("Alarm ACK: strap confirmed \(fmt.string(from: date))")
+                            // Notify the caller so UI can update armedEpoch only after real confirmation.
+                            let cb = pendingAlarmOnConfirmed
+                            pendingAlarmOnConfirmed = nil
+                            cb?(date)
                         }
                     }
                 }

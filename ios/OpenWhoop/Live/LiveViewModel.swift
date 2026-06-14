@@ -78,8 +78,9 @@ public final class LiveViewModel: ObservableObject {
     // directly (it holds it weakly); we hand it ours via armStrapAlarm(at:).
 
     @discardableResult
-    public func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3) {
-        ble.armStrapAlarm(at: date, patternId: patternId, loops: loops)
+    public func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3,
+                              onConfirmed: ((Date) -> Void)? = nil) {
+        ble.armStrapAlarm(at: date, patternId: patternId, loops: loops, onConfirmed: onConfirmed)
     }
 
     /// Disarm the currently-armed firmware alarm.
@@ -92,13 +93,23 @@ public final class LiveViewModel: ObservableObject {
 
     /// Re-arms the strap alarm for the next occurrence of the user's saved wake time.
     /// Called on every foreground so the strap always has tomorrow's alarm loaded after
-    /// today's fires. No-op if the alarm is disabled.
+    /// today's fires. No-op if the alarm is disabled OR if the currently armed time is
+    /// still in the future (prevents a re-arm storm on rapid foreground/background cycles).
     private func rescheduleAlarmIfNeeded() {
         guard alarmEnabled else { return }
         let candidate = AlarmView.todayAt(hour: wakeByHour, minute: wakeByMinute)
         let fireDate = candidate > Date()
             ? candidate
             : Calendar.current.date(byAdding: .day, value: 1, to: candidate) ?? candidate
+        // Don't re-arm if the strap already has this exact alarm time armed and it's still future.
+        let currentArmedEpoch = UserDefaults.standard.double(forKey: AlarmKeys.armedEpoch)
+        if currentArmedEpoch > 0 {
+            let armedDate = Date(timeIntervalSince1970: currentArmedEpoch)
+            if armedDate > Date() && abs(armedDate.timeIntervalSince(fireDate)) < 60 {
+                // Already armed for roughly the same upcoming time — skip.
+                return
+            }
+        }
         ble.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount))
     }
 
