@@ -913,12 +913,16 @@ extension BLEManager: CBPeripheralDelegate {
                             let date = Date(timeIntervalSince1970: TimeInterval(epoch))
                             let fmt = DateFormatter()
                             fmt.dateStyle = .short; fmt.timeStyle = .short
-                            fmt.timeZone = TimeZone.current 
-                            log("Alarm ACK: strap confirmed \(fmt.string(from: date))")
-                            // Notify the caller so UI can update armedEpoch only after real confirmation.
-                            let cb = pendingAlarmOnConfirmed
-                            pendingAlarmOnConfirmed = nil
-                            cb?(date)
+                            fmt.timeZone = TimeZone.current
+                            let hoursUntil = date.timeIntervalSinceNow / 3600
+                            if hoursUntil < 0 || hoursUntil > 24 {
+                                log("Alarm ACK: strap returned suspicious time \(fmt.string(from: date)) — ignoring")
+                            } else {
+                                log("Alarm ACK: strap confirmed \(fmt.string(from: date))")
+                                let cb = pendingAlarmOnConfirmed
+                                pendingAlarmOnConfirmed = nil
+                                cb?(date)
+                            }
                         }
                     }
                 }
