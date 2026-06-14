@@ -377,6 +377,10 @@ public final class BLEManager: NSObject, ObservableObject {
                 self?.requestSync(.timeout)
             }
         }
+        if let deferred = deferredAlarm {
+            deferredAlarm = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { deferred() }
+        }
     }
 
     /// After an offload, judge liveness: stuck = strap reports records newer than our frontier AND our
@@ -526,6 +530,13 @@ public final class BLEManager: NSObject, ObservableObject {
     /// alarm persists across BLE disconnect (cannot be verified in the simulator).
     func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3,
                        onConfirmed: ((Date) -> Void)? = nil) {
+        guard !backfilling else {
+            log("Alarm: backfill in progress — deferring until offload completes")
+            deferredAlarm = { [weak self] in
+                self?.armStrapAlarm(at: date, patternId: patternId, loops: loops, onConfirmed: onConfirmed)
+            }
+            return
+        }
         let epochSec = UInt32(date.timeIntervalSince1970)
         // Store haptic config so the ACK handler can pass it back to the caller.
         pendingAlarmPatternId = patternId
@@ -555,6 +566,7 @@ public final class BLEManager: NSObject, ObservableObject {
     private var pendingAlarmPatternId: UInt8 = 2
     private var pendingAlarmLoops: UInt8 = 3
     private var pendingAlarmOnConfirmed: ((Date) -> Void)?
+    private var deferredAlarm: (() -> Void)?
 
 
 
