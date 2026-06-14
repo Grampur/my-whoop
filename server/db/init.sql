@@ -152,6 +152,7 @@ ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS calories_kcal REAL;
 ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS calories_kj   REAL;
 
 ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS manually_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE exercise_sessions ADD COLUMN IF NOT EXISTS distance_mi DOUBLE PRECISION;
 
 -- User profile (height/weight/age/sex) used for calorie estimation.
 -- One row per device; upserted via POST /v1/profile.

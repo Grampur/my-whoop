@@ -258,7 +258,7 @@ def query_sleep(conn, device_id, day):
 _WORKOUT_COLS = [
     "device_id", "start_ts", "end_ts", "avg_hr", "peak_hr", "strain", "kind",
     "duration_s", "zone_time_pct", "avg_hrr_pct", "hrmax", "hrmax_source",
-    "calories_kcal", "calories_kj",
+    "calories_kcal", "calories_kj", "distance_mi",
 ]
 
 

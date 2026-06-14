@@ -212,31 +212,32 @@ def upsert_exercise_sessions(conn: psycopg.Connection, device_id: str, sessions)
             zt = s.get("zone_time_pct")
             cur.execute(
                 """INSERT INTO exercise_sessions
-                   (device_id, start_ts, end_ts, avg_hr, peak_hr, strain, kind,
-                    duration_s, zone_time_pct, avg_hrr_pct, hrmax, hrmax_source,
-                    calories_kcal, calories_kj)
-                   VALUES (%s, to_timestamp(%s), to_timestamp(%s), %s, %s, %s, %s,
-                           %s, %s, %s, %s, %s, %s, %s)
-                   ON CONFLICT (device_id, start_ts) DO UPDATE SET
-                     end_ts        = EXCLUDED.end_ts,
-                     avg_hr        = EXCLUDED.avg_hr,
-                     peak_hr       = EXCLUDED.peak_hr,
-                     strain        = EXCLUDED.strain,
-                     kind          = COALESCE(exercise_sessions.kind, EXCLUDED.kind),
-                     duration_s    = EXCLUDED.duration_s,
-                     zone_time_pct = EXCLUDED.zone_time_pct,
-                     avg_hrr_pct   = EXCLUDED.avg_hrr_pct,
-                     hrmax         = EXCLUDED.hrmax,
-                     hrmax_source  = EXCLUDED.hrmax_source,
-                     calories_kcal = EXCLUDED.calories_kcal,
-                     calories_kj   = EXCLUDED.calories_kj,
-                     manually_deleted = FALSE""",
-                (device_id, s["start"], s["end"], s.get("avg_hr"),
-                 s.get("peak_hr"), s.get("strain"), s.get("kind"),
-                 (int(round(s["duration_s"])) if s.get("duration_s") is not None else None),
-                 (json.dumps(zt) if zt is not None else None),
-                 s.get("avg_hrr_pct"), s.get("hrmax"), s.get("hrmax_source"),
-                 s.get("calories_kcal"), s.get("calories_kj")))
+                    (device_id, start_ts, end_ts, avg_hr, peak_hr, strain, kind,
+                        duration_s, zone_time_pct, avg_hrr_pct, hrmax, hrmax_source,
+                        calories_kcal, calories_kj, distance_mi)
+                    VALUES (%s, to_timestamp(%s), to_timestamp(%s), %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (device_id, start_ts) DO UPDATE SET
+                        end_ts        = EXCLUDED.end_ts,
+                        avg_hr        = EXCLUDED.avg_hr,
+                        peak_hr       = EXCLUDED.peak_hr,
+                        strain        = EXCLUDED.strain,
+                        kind          = COALESCE(exercise_sessions.kind, EXCLUDED.kind),
+                        duration_s    = EXCLUDED.duration_s,
+                        zone_time_pct = EXCLUDED.zone_time_pct,
+                        avg_hrr_pct   = EXCLUDED.avg_hrr_pct,
+                        hrmax         = EXCLUDED.hrmax,
+                        hrmax_source  = EXCLUDED.hrmax_source,
+                        calories_kcal = EXCLUDED.calories_kcal,
+                        calories_kj   = EXCLUDED.calories_kj,
+                        distance_mi   = EXCLUDED.distance_mi,
+                        manually_deleted = exercise_sessions.manually_deleted""",
+                    (device_id, s["start"], s["end"], s.get("avg_hr"),
+                    s.get("peak_hr"), s.get("strain"), s.get("kind"),
+                    (int(round(s["duration_s"])) if s.get("duration_s") is not None else None),
+                    (json.dumps(zt) if zt is not None else None),
+                    s.get("avg_hrr_pct"), s.get("hrmax"), s.get("hrmax_source"),
+                    s.get("calories_kcal"), s.get("calories_kj"), s.get("distance_mi")))
 
 
 def query_sleep_overrides(conn: psycopg.Connection, device_id: str) -> dict[float, float]:

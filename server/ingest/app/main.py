@@ -329,6 +329,24 @@ def patch_workout_kind(start_ts: float, device: str, body: dict):
         raise HTTPException(status_code=404, detail="workout not found")
     return {"status": "ok", "kind": kind}
 
+# --- Adding distance ---------------------------------------------------------
+@app.patch("/v1/workouts/{start_ts}/set-distance", dependencies=[Depends(require_auth)])
+def patch_workout_distance(start_ts: float, device: str, body: dict):
+    """Set or clear the distance (miles) on a workout."""
+    distance_mi = body.get("distance_mi")
+    with psycopg.connect(cfg.db_dsn) as conn:
+        result = conn.execute(
+            "UPDATE exercise_sessions SET distance_mi = %s "
+            "WHERE device_id = %s AND ABS(EXTRACT(EPOCH FROM start_ts) - %s) < 2 "
+            "RETURNING start_ts",
+            (distance_mi, device, start_ts)
+        )
+        row = result.fetchone()
+        conn.commit()
+    if row is None:
+        raise HTTPException(status_code=404, detail="workout not found")
+    return {"status": "ok", "distance_mi": distance_mi}
+
 # --- Delete Workout ------------------------------------------------------------
 @app.delete("/v1/workouts/{start_ts}", dependencies=[Depends(require_auth)])
 def delete_workout(start_ts: float, device: str):
@@ -353,6 +371,7 @@ class ManualWorkout(BaseModel):
     start_ts: float   # unix epoch seconds
     end_ts: float     # unix epoch seconds
     kind: str | None = None  # e.g. "weightlifting", "cardio"
+    distance_mi: float | None = None
 
 @app.post("/v1/manual-workout", dependencies=[Depends(require_auth)])
 def manual_workout(body: ManualWorkout):
@@ -443,6 +462,7 @@ def manual_workout(body: ManualWorkout):
                 "hrmax_source":  hrmax_source,
                 "calories_kcal": cal_kcal,
                 "calories_kj":   cal_kj,
+                "distance_mi":   body.distance_mi,
             }]
         else:
             # Convert ExerciseSession dataclasses to dicts and apply kind tag
@@ -450,6 +470,8 @@ def manual_workout(body: ManualWorkout):
                 if body.kind:
                     s.kind = body.kind
             sessions = [_exercise_to_dict(s) for s in sessions]
+            for s in sessions:
+                s["distance_mi"] = body.distance_mi
 
         store.upsert_exercise_sessions(conn, body.device, sessions)
         conn.commit()
