@@ -263,6 +263,7 @@ struct AlarmView: View {
         alarmEnabled = true
         // Don't write armedEpoch yet — wait for the strap to confirm via the ACK callback.
         // This prevents the status line from showing "Alarm set" when the strap rejected it.
+        armedEpoch = fireDate.timeIntervalSince1970
         live.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount)) { [self] confirmedDate in
             armedEpoch = confirmedDate.timeIntervalSince1970
         }
