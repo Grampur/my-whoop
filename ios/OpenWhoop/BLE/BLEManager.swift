@@ -532,16 +532,12 @@ public final class BLEManager: NSObject, ObservableObject {
             self.send(.setClock, payload: BLEManager.setClockPayload())
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self else { return }
-                self.send(.runHapticsPattern, payload: [patternId, loops, 0, 0, 0])
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    guard let self else { return }
-                    self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
-                            writeType: .withResponse)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                        self?.send(.getAlarmTime, payload: [0x01])
-                    }
-                    self.log("Alarm: armed for \(date) (epoch \(epochSec), pattern=\(patternId), loops=\(loops)) — awaiting strap ACK")
+                self.send(.setAlarmTime, payload: WhoopCommand.setAlarmPayload(epochSec: epochSec),
+                        writeType: .withResponse)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.send(.getAlarmTime, payload: [0x01])
                 }
+                self.log("Alarm: armed for \(date) (epoch \(epochSec), pattern=\(patternId), loops=\(loops)) — awaiting strap ACK")
             }
         }
     }
