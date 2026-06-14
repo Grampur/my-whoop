@@ -13,6 +13,14 @@ public final class LiveViewModel: ObservableObject {
     /// One-line storage summary for the UI; refreshed periodically from LiveView.
     @Published public var storageSummary: String = "stored: —"
 
+    // Alarm settings mirrored from UserDefaults so rescheduleAlarmIfNeeded() can read
+    // them without needing a View context.
+    @AppStorage(AlarmKeys.enabled)      private var alarmEnabled: Bool = false
+    @AppStorage(AlarmKeys.wakeByHour)   private var wakeByHour: Int   = 7
+    @AppStorage(AlarmKeys.wakeByMinute) private var wakeByMinute: Int = 0
+    @AppStorage(AlarmKeys.patternId)    private var patternId: Int     = 2
+    @AppStorage(AlarmKeys.loopCount)    private var loopCount: Int     = 3
+
     public init(deviceId: String = "my-whoop") {
         let s = LiveState()
         self.state = s
@@ -28,9 +36,20 @@ public final class LiveViewModel: ObservableObject {
             .compactMap { $0 }
             .sink { _ in SyncNudge.reschedule() }
             .store(in: &cancellables)
+
+        // Re-arm the strap alarm every time the app foregrounds so the strap always
+        // has the next occurrence loaded (handles the daily repeat without strap-side
+        // repeat support).
+        NotificationCenter.default.addObserver(
+            forName: .appDidBecomeActive,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.rescheduleAlarmIfNeeded()
+        }
     }
 
-    public func connect()  { ble.connect() }
+    public func connect()    { ble.connect() }
     public func disconnect() { ble.disconnect() }
     public func startRealtimeHR() { ble.send(.toggleRealtimeHR, payload: [0x01]) }
     public func stopRealtimeHR()  { ble.send(.toggleRealtimeHR, payload: [0x00]) }
@@ -57,8 +76,6 @@ public final class LiveViewModel: ObservableObject {
     // BLEManager reference. SmartAlarmController.schedule() still receives the BLEManager
     // directly (it holds it weakly); we hand it ours via armStrapAlarm(at:).
 
-    /// Arm the strap's firmware alarm for `date`. Also returns the BLEManager so
-    /// SmartAlarmController can hold a weak reference to the shared instance.
     @discardableResult
     public func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3) {
         ble.armStrapAlarm(at: date, patternId: patternId, loops: loops)
@@ -69,6 +86,20 @@ public final class LiveViewModel: ObservableObject {
 
     /// Request the current alarm time from the strap.
     public func getStrapAlarm() { ble.getStrapAlarm() }
+
+    // MARK: - Daily alarm reschedule
+
+    /// Re-arms the strap alarm for the next occurrence of the user's saved wake time.
+    /// Called on every foreground so the strap always has tomorrow's alarm loaded after
+    /// today's fires. No-op if the alarm is disabled.
+    private func rescheduleAlarmIfNeeded() {
+        guard alarmEnabled else { return }
+        let candidate = AlarmView.todayAt(hour: wakeByHour, minute: wakeByMinute)
+        let fireDate = candidate > Date()
+            ? candidate
+            : Calendar.current.date(byAdding: .day, value: 1, to: candidate) ?? candidate
+        ble.armStrapAlarm(at: fireDate, patternId: UInt8(patternId), loops: UInt8(loopCount))
+    }
 
     // MARK: - Lifecycle
 
