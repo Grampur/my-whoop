@@ -164,7 +164,7 @@ struct AlarmView: View {
                 Button(role: .destructive) {
                     disableAlarm()
                 } label: {
-                    Label("Turn off", systemImage: "alarm.slash")
+                    Label("Turn off", systemImage: "bell.slash")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, WH.Spacing.xs)
                 }
@@ -200,7 +200,7 @@ struct AlarmView: View {
                     }
                 } else {
                     HStack(spacing: WH.Spacing.xs) {
-                        Image(systemName: "alarm.slash")
+                        Image(systemName: "bell.slash")
                             .foregroundStyle(WH.Color.textSecondary)
                             .font(.system(size: 14))
                         Text("No alarm set")
