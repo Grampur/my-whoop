@@ -230,7 +230,7 @@ def upsert_exercise_sessions(conn: psycopg.Connection, device_id: str, sessions)
                      hrmax_source  = EXCLUDED.hrmax_source,
                      calories_kcal = EXCLUDED.calories_kcal,
                      calories_kj   = EXCLUDED.calories_kj,
-                     manually_deleted = exercise_sessions.manually_deleted""",
+                     manually_deleted = FALSE""",
                 (device_id, s["start"], s["end"], s.get("avg_hr"),
                  s.get("peak_hr"), s.get("strain"), s.get("kind"),
                  (int(round(s["duration_s"])) if s.get("duration_s") is not None else None),
