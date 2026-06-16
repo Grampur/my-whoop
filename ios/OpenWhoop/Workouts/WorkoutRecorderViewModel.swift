@@ -46,7 +46,8 @@ final class WorkoutRecorderViewModel: ObservableObject {
         defer { isSubmitting = false }
 
         let end = Date()
-        let ok = await logAction?(start.timeIntervalSince1970, end.timeIntervalSince1970, selectedType?.rawValue, distanceMi) ?? false        if !ok {
+        let ok = await logAction?(start.timeIntervalSince1970, end.timeIntervalSince1970, selectedType?.rawValue,distanceMi) ?? false
+        if !ok {
             errorMessage = "Couldn't save workout — check server connection."
         }
         return ok
