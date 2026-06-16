@@ -124,9 +124,16 @@ struct WorkoutDetailView: View {
                      color: WH.Color.recoveryRed)
             divider
             statCell(label: "CALORIES",
-                     value: workout.caloriesKcal.map { String(format: "%.0f", $0) } ?? "—",
-                     unit: workout.caloriesKcal != nil ? "kcal" : nil,
-                     color: workout.caloriesKcal != nil ? WH.Color.recoveryYellow : WH.Color.textSecondary)
+                    value: workout.caloriesKcal.map { String(format: "%.0f", $0) } ?? "—",
+                    unit: workout.caloriesKcal != nil ? "kcal" : nil,
+                    color: workout.caloriesKcal != nil ? WH.Color.recoveryYellow : WH.Color.textSecondary)
+            if let dist = workout.distanceMi {
+                divider
+                statCell(label: "DISTANCE",
+                        value: String(format: "%.2f", dist),
+                        unit: "mi",
+                        color: WH.Color.teal)
+            }
         }
         .padding(.vertical, WH.Spacing.sm)
         .background(WH.Color.surface,

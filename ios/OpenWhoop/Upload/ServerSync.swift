@@ -488,7 +488,8 @@ final class ServerSync {
                 hrmax: dbl(r, "hrmax"),
                 hrmaxSource: (r["hrmax_source"] as? String) ?? (r["hrmaxSource"] as? String) ?? "",
                 caloriesKcal: dbl(r, "calories_kcal") ?? dbl(r, "caloriesKcal"),
-                caloriesKj: dbl(r, "calories_kj") ?? dbl(r, "caloriesKj")
+                caloriesKj: dbl(r, "calories_kj") ?? dbl(r, "caloriesKj"),
+                distanceMi: dbl(r, "distance_mi") ?? dbl(r, "distanceMi")
             )
         }
     }
@@ -541,7 +542,8 @@ final class ServerSync {
                 hrmax: dbl(r, "hrmax"),
                 hrmaxSource: (r["hrmax_source"] as? String) ?? (r["hrmaxSource"] as? String) ?? "",
                 caloriesKcal: dbl(r, "calories_kcal") ?? dbl(r, "caloriesKcal"),
-                caloriesKj: dbl(r, "calories_kj") ?? dbl(r, "caloriesKj")
+                caloriesKj: dbl(r, "calories_kj") ?? dbl(r, "caloriesKj"),
+                distanceMi: dbl(r, "distance_mi") ?? dbl(r, "distanceMi")
             )
         }
         // Server returns ascending; we reverse so newest is first (list view shows newest at top).
@@ -741,13 +743,14 @@ final class ServerSync {
     // MARK: - Manual workout
     /// POST /v1/manual-workout — logs a retroactive or just-completed workout.
     /// Returns true on 2xx (the server computed + stored the row).
-    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?) async -> Bool {
+    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?, distanceMi: Double?) async -> Bool {
         var body: [String: Any] = [
             "device": deviceId,
             "start_ts": startTs,
             "end_ts": endTs,
         ]
         if let kind { body["kind"] = kind }
+        if let distanceMi { body["distance_mi"] = distanceMi }
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return false }
         return await post(path: "/v1/manual-workout", body: bodyData)
     }
@@ -809,4 +812,5 @@ struct Workout: Identifiable, Equatable {
     let hrmaxSource: String
     let caloriesKcal: Double?
     let caloriesKj: Double?
+    let distanceMi: Double?
 }

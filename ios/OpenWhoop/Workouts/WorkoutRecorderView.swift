@@ -11,6 +11,11 @@ struct WorkoutRecorderView: View {
     var onWorkoutLogged: (() async -> Void)? = nil
 
     @StateObject private var vm = WorkoutRecorderViewModel()
+    @State private var distTens:      Int = 0
+    @State private var distOnes:      Int = 0
+    @State private var distTenths:    Int = 0
+    @State private var distHundredths: Int = 0
+    @State private var distanceEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -21,6 +26,7 @@ struct WorkoutRecorderView: View {
                     hrDisplay
                     timerDisplay
                     typePickerInline
+                    distanceSection
                     Spacer()
                     actionButtons
                 }
@@ -41,8 +47,8 @@ struct WorkoutRecorderView: View {
             }
             .onAppear {
                 vm.currentHR = live.state.heartRate
-                vm.logAction = { startTs, endTs, kind in
-                    await metrics.logManualWorkout(startTs: startTs, endTs: endTs, kind: kind)
+                vm.logAction = { startTs, endTs, kind, distanceMi in
+                    await metrics.logManualWorkout(startTs: startTs, endTs: endTs, kind: kind, distanceMi: distanceMi)
                 }
             }
             .onChange(of: live.state.heartRate) { hr in
@@ -125,6 +131,60 @@ struct WorkoutRecorderView: View {
         }
     }
 
+    private var distanceMiValue: Double {
+        guard distanceEnabled else { return 0 }
+        return Double(distTens) * 10 + Double(distOnes) + Double(distTenths) * 0.1 + Double(distHundredths) * 0.01
+    }
+
+    private var distanceSection: some View {
+        VStack(spacing: WH.Spacing.sm) {
+            HStack {
+                Text("DISTANCE (OPTIONAL)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(WH.Color.textSecondary)
+                    .kerning(0.8)
+                Spacer()
+                Toggle("", isOn: $distanceEnabled)
+                    .labelsHidden()
+                    .tint(WH.Color.strainBlue)
+            }
+            .padding(.horizontal, WH.Spacing.md)
+
+            if distanceEnabled {
+                HStack(spacing: 0) {
+                    digitRoller($distTens)
+                    digitRoller($distOnes)
+                    Text(".")
+                        .font(.system(size: 28, weight: .semibold, design: .rounded))
+                        .foregroundStyle(WH.Color.textPrimary)
+                        .frame(width: 16)
+                    digitRoller($distTenths)
+                    digitRoller($distHundredths)
+                    Text(" mi")
+                        .font(.system(size: 18, weight: .medium, design: .rounded))
+                        .foregroundStyle(WH.Color.textSecondary)
+                        .padding(.leading, 8)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, WH.Spacing.sm)
+            }
+        }
+    }
+
+    private func digitRoller(_ binding: Binding<Int>) -> some View {
+        Picker("", selection: binding) {
+            ForEach(0..<10, id: \.self) { n in
+                Text("\(n)")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(WH.Color.textPrimary)
+                    .tag(n)
+            }
+        }
+        .pickerStyle(.wheel)
+        .frame(width: 52, height: 100)
+        .clipped()
+    }
+
     // MARK: - Action buttons
 
     private var actionButtons: some View {
@@ -151,7 +211,8 @@ struct WorkoutRecorderView: View {
             } else {
                 Button {
                     Task {
-                        let ok = await vm.stopWorkout()
+                        let dist: Double? = distanceEnabled && distanceMiValue > 0 ? distanceMiValue : nil
+                        let ok = await vm.stopWorkout(distanceMi: dist)
                         if ok {
                             await onWorkoutLogged?()
                             dismiss()

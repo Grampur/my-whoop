@@ -19,7 +19,7 @@ final class WorkoutRecorderViewModel: ObservableObject {
 
     // Injected so the ViewModel doesn't own a MetricsRepository directly —
     // the view passes metrics.logManualWorkout via the stopAction closure.
-    var logAction: ((_ startTs: TimeInterval, _ endTs: TimeInterval, _ kind: String?) async -> Bool)?
+    var logAction: ((_ startTs: TimeInterval, _ endTs: TimeInterval, _ kind: String?, _ distanceMi: Double?) async -> Bool)?
 
     // MARK: - Timer control
 
@@ -37,7 +37,7 @@ final class WorkoutRecorderViewModel: ObservableObject {
             }
     }
 
-    func stopWorkout() async -> Bool {
+    func stopWorkout(distanceMi: Double? = nil) async -> Bool {
         guard isRecording, let start = startTimestamp else { return false }
         timer?.cancel()
         timer = nil
@@ -46,8 +46,7 @@ final class WorkoutRecorderViewModel: ObservableObject {
         defer { isSubmitting = false }
 
         let end = Date()
-        let ok = await logAction?(start.timeIntervalSince1970, end.timeIntervalSince1970, selectedType?.rawValue) ?? false
-        if !ok {
+        let ok = await logAction?(start.timeIntervalSince1970, end.timeIntervalSince1970, selectedType?.rawValue, distanceMi) ?? false        if !ok {
             errorMessage = "Couldn't save workout — check server connection."
         }
         return ok

@@ -372,7 +372,8 @@ final class MetricsRepository: ObservableObject {
                 hrmax: w.hrmax,
                 hrmaxSource: w.hrmaxSource,
                 caloriesKcal: w.caloriesKcal,
-                caloriesKj: w.caloriesKj
+                caloriesKj: w.caloriesKj,
+                distanceMi: w.distanceMi
             )
         }
     }
@@ -438,10 +439,10 @@ final class MetricsRepository: ObservableObject {
     // MARK: - Manual workout entry
     /// POSTs a manual workout window to the server, then refreshes the local workout cache.
     /// Returns true if the server accepted it.
-    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?) async -> Bool {
+    func logManualWorkout(startTs: TimeInterval, endTs: TimeInterval, kind: String?, distanceMi: Double?) async -> Bool {
         await ensureOpen()
         guard let sync = serverSync else { return false }
-        let ok = await sync.logManualWorkout(startTs: startTs, endTs: endTs, kind: kind)
+        let ok = await sync.logManualWorkout(startTs: startTs, endTs: endTs, kind: kind, distanceMi: distanceMi)
         if ok { await sync.pull() }
         return ok
     }

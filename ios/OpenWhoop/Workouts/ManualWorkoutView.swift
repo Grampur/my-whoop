@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - ManualWorkoutView
-// Retroactive workout entry — pick start/end time + activity type, POST to /v1/manual-workout.
+// Retroactive workout entry — pick start/end time + activity type + optional distance, POST to /v1/manual-workout.
 // Presented as a sheet from WorkoutsView.
 
 struct ManualWorkoutView: View {
@@ -17,6 +17,13 @@ struct ManualWorkoutView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String? = nil
 
+    // Distance roller: tens, ones, tenths, hundredths  → "xx.xx"
+    @State private var distTens:      Int = 0
+    @State private var distOnes:      Int = 0
+    @State private var distTenths:    Int = 0
+    @State private var distHundredths: Int = 0
+    @State private var distanceEnabled = false
+
     // MARK: - Body
 
     var body: some View {
@@ -27,6 +34,7 @@ struct ManualWorkoutView: View {
                     VStack(alignment: .leading, spacing: WH.Spacing.lg) {
                         timeSection
                         activitySection
+                        distanceSection
                         if let err = errorMessage {
                             errorBanner(err)
                         }
@@ -149,6 +157,73 @@ struct ManualWorkoutView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Distance section
+
+    private var distanceSection: some View {
+        VStack(alignment: .leading, spacing: WH.Spacing.sm) {
+            HStack {
+                Text("DISTANCE (OPTIONAL)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(WH.Color.textSecondary)
+                    .kerning(0.8)
+                Spacer()
+                Toggle("", isOn: $distanceEnabled)
+                    .labelsHidden()
+                    .tint(WH.Color.strainBlue)
+            }
+
+            if distanceEnabled {
+                VStack(spacing: WH.Spacing.sm) {
+                    // Roller
+                    HStack(spacing: 0) {
+                        digitRoller($distTens)
+                        digitRoller($distOnes)
+                        Text(".")
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .foregroundStyle(WH.Color.textPrimary)
+                            .frame(width: 16)
+                        digitRoller($distTenths)
+                        digitRoller($distHundredths)
+                        Text(" mi")
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .foregroundStyle(WH.Color.textSecondary)
+                            .padding(.leading, 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, WH.Spacing.md)
+                    .background(WH.Color.surface,
+                                in: RoundedRectangle(cornerRadius: WH.Radius.card, style: .continuous))
+
+                    if distanceMiValue > 0 {
+                        Text(String(format: "%.2f miles", distanceMiValue))
+                            .font(WH.Font.caption)
+                            .foregroundStyle(WH.Color.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func digitRoller(_ binding: Binding<Int>) -> some View {
+        Picker("", selection: binding) {
+            ForEach(0..<10, id: \.self) { n in
+                Text("\(n)")
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(WH.Color.textPrimary)
+                    .tag(n)
+            }
+        }
+        .pickerStyle(.wheel)
+        .frame(width: 52, height: 100)
+        .clipped()
+    }
+
+    private var distanceMiValue: Double {
+        guard distanceEnabled else { return 0 }
+        let v = Double(distTens) * 10 + Double(distOnes) + Double(distTenths) * 0.1 + Double(distHundredths) * 0.01
+        return v
+    }
+
     // MARK: - Submit
 
     private var submitButton: some View {
@@ -205,10 +280,12 @@ struct ManualWorkoutView: View {
         isSubmitting = true
         defer { isSubmitting = false }
 
+        let dist: Double? = distanceEnabled && distanceMiValue > 0 ? distanceMiValue : nil
         let ok = await metrics.logManualWorkout(
             startTs: startDate.timeIntervalSince1970,
             endTs: endDate.timeIntervalSince1970,
-            kind: selectedType?.rawValue
+            kind: selectedType?.rawValue,
+            distanceMi: dist
         )
         if ok {
             await onWorkoutLogged?()

@@ -74,17 +74,18 @@ public struct CachedWorkout: Equatable {
     public let hrmaxSource: String
     public let caloriesKcal: Double?
     public let caloriesKj: Double?
+    public let distanceMi: Double?
 
     public init(startTs: Int, endTs: Int, avgHr: Double, peakHr: Int, strain: Double?,
                 kind: String?, durationS: Int, zoneTimePctJSON: String?,
                 avgHrrPct: Double?, hrmax: Double?, hrmaxSource: String,
-                caloriesKcal: Double?, caloriesKj: Double?) {
+                caloriesKcal: Double?, caloriesKj: Double?, distanceMi: Double? = nil) {
         self.startTs = startTs; self.endTs = endTs
         self.avgHr = avgHr; self.peakHr = peakHr
         self.strain = strain; self.kind = kind; self.durationS = durationS
         self.zoneTimePctJSON = zoneTimePctJSON
         self.avgHrrPct = avgHrrPct; self.hrmax = hrmax; self.hrmaxSource = hrmaxSource
-        self.caloriesKcal = caloriesKcal; self.caloriesKj = caloriesKj
+        self.caloriesKcal = caloriesKcal; self.caloriesKj = caloriesKj;self.distanceMi = distanceMi
     }
 }
 
@@ -163,8 +164,8 @@ extension WhoopStore {
                 try db.execute(sql: """
                     INSERT INTO workoutSession
                         (deviceId, startTs, endTs, avgHr, peakHr, strain, kind, durationS,
-                        zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj, distanceMi)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(deviceId, startTs) DO UPDATE SET
                         endTs = excluded.endTs,
                         avgHr = excluded.avgHr,
@@ -177,11 +178,12 @@ extension WhoopStore {
                         hrmax = excluded.hrmax,
                         hrmaxSource = excluded.hrmaxSource,
                         caloriesKcal = excluded.caloriesKcal,
-                        caloriesKj = excluded.caloriesKj
+                        caloriesKj = excluded.caloriesKj,
+                        distanceMi = COALESCE(excluded.distanceMi, workoutSession.distanceMi)
                     """, arguments: [deviceId, w.startTs, w.endTs, w.avgHr, w.peakHr,
                                     w.strain, w.kind, w.durationS, w.zoneTimePctJSON,
                                     w.avgHrrPct, w.hrmax, w.hrmaxSource,
-                                    w.caloriesKcal, w.caloriesKj])
+                                    w.caloriesKcal, w.caloriesKj, w.distanceMi])
                 n += db.changesCount
             }
             return n
@@ -355,7 +357,7 @@ extension WhoopStore {
         try syncRead { db in
             try Row.fetchAll(db, sql: """
                 SELECT startTs, endTs, avgHr, peakHr, strain, kind, durationS,
-                       zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj
+                    zoneTimePctJSON, avgHrrPct, hrmax, hrmaxSource, caloriesKcal, caloriesKj, distanceMi
                 FROM workoutSession
                 WHERE deviceId = ? AND startTs >= ? AND startTs <= ?
                 ORDER BY startTs DESC
@@ -369,7 +371,8 @@ extension WhoopStore {
                                   avgHrrPct: $0["avgHrrPct"], hrmax: $0["hrmax"],
                                   hrmaxSource: $0["hrmaxSource"] ?? "",
                                   caloriesKcal: $0["caloriesKcal"],
-                                  caloriesKj: $0["caloriesKj"])
+                                  caloriesKj: $0["caloriesKj"],
+                                  distanceMi: $0["distanceMi"])
                 }
         }
     }

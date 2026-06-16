@@ -474,6 +474,18 @@ def manual_workout(body: ManualWorkout):
                 s["distance_mi"] = body.distance_mi
 
         store.upsert_exercise_sessions(conn, body.device, sessions)
+        # Auto-update max_hr in profile if a new peak was hit
+        all_peaks = [s.get("peak_hr") for s in sessions if s.get("peak_hr")]
+        if all_peaks:
+            new_peak = max(all_peaks)
+            current_max = profile.get("max_hr") if profile else None
+            if current_max is None or new_peak > current_max:
+                store.upsert_profile(conn, body.device,
+                                     height_cm=profile.get("height_cm"),
+                                     weight_kg=profile.get("weight_kg"),
+                                     age=profile.get("age"),
+                                     sex=profile.get("sex"),
+                                     max_hr=new_peak)
         conn.commit()
 
     return sessions
