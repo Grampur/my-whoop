@@ -326,7 +326,7 @@ struct SleepView: View {
 
                 MetricCard(
                     title: "HRV",
-                    value: (daily?.avgHrv ?? session?.avgHrv).map { String(format: "%.0f", $0) } ?? "—",
+                    value: (session?.avgHrv ?? daily?.avgHrv).map { String(format: "%.0f", $0) } ?? "—",
                     unit: (daily?.avgHrv ?? session?.avgHrv) != nil ? "ms" : nil,
                     accentColor: (daily?.avgHrv ?? session?.avgHrv) != nil ? WH.Color.recoveryGreen : WH.Color.textSecondary
                 )
