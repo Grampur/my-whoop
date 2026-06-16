@@ -378,6 +378,38 @@ final class MetricsRepository: ObservableObject {
         }
     }
 
+    /// Workouts since the end of the last sleep session (current day cycle).
+    /// Falls back to the last 24 h if no sleep is found.
+    func workoutsSinceLastSleep() async -> [Workout] {
+        await ensureOpen()
+        guard let store else { return [] }
+        let fromTs = lastNight.map { $0.endTs } ?? Int(Date().timeIntervalSince1970) - 86_400
+        let toTs   = Int(Date().timeIntervalSince1970) + 3_600
+        let cached = (try? await store.workouts(deviceId: deviceId, from: fromTs, to: toTs)) ?? []
+        return cached.map { w in
+            var zones: [Int: Double] = [:]
+            if let json = w.zoneTimePctJSON,
+            let obj = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] {
+                for (k, v) in obj {
+                    if let zone = Int(k), let pct = (v as? NSNumber)?.doubleValue ?? (v as? Double) {
+                        zones[zone] = pct
+                    }
+                }
+            }
+            return Workout(
+                id: "\(deviceId)|\(w.startTs)",
+                deviceId: deviceId,
+                startTs: w.startTs, endTs: w.endTs,
+                avgHr: w.avgHr, peakHr: w.peakHr,
+                strain: w.strain, kind: w.kind, durationS: w.durationS,
+                zoneTimePct: zones, avgHrrPct: w.avgHrrPct,
+                hrmax: w.hrmax, hrmaxSource: w.hrmaxSource,
+                caloriesKcal: w.caloriesKcal, caloriesKj: w.caloriesKj,
+                distanceMi: w.distanceMi
+            )
+        }
+    }
+
     func fetchStrainCoach(date: String) async -> ServerSync.StrainCoach? {
         await ensureOpen()
         let result = await serverSync?.getStrainCoach(date: date)

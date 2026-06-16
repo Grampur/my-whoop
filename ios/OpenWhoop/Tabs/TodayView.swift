@@ -9,6 +9,9 @@ struct TodayView: View {
     @EnvironmentObject private var metrics: MetricsRepository
     @EnvironmentObject private var live: LiveViewModel
 
+    @State private var todayWorkouts: [Workout] = []
+    @State private var selectedWorkout: Workout? = nil
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -27,8 +30,18 @@ struct TodayView: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
-        .task { await metrics.refresh() }
-        .refreshable { await metrics.refresh() }
+        .task {
+            await metrics.refresh()
+            todayWorkouts = await metrics.workoutsSinceLastSleep()
+        }
+        .refreshable {
+            await metrics.refresh()
+            todayWorkouts = await metrics.workoutsSinceLastSleep()
+        }
+        .sheet(item: $selectedWorkout) { workout in
+            TodayWorkoutModal(workout: workout)
+                .environmentObject(metrics)
+        }
     }
 
     // MARK: - Loading
@@ -63,6 +76,11 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 // Strain Coach card
                 strainCoachCard
+
+                // Today's activities (workouts since last sleep)
+                if !todayWorkouts.isEmpty {
+                    todayActivitiesSection
+                }
 
                 // Sleep card → sleep duration history
                 NavigationLink(destination: MetricDetailView(kind: .sleepDuration)) {
@@ -185,6 +203,97 @@ struct TodayView: View {
                     .foregroundStyle(WH.Color.textSecondary)
             }
         }
+    }
+
+    // MARK: - Today's activities
+
+    private var todayActivitiesSection: some View {
+        VStack(alignment: .leading, spacing: WH.Spacing.sm) {
+            Text("TODAY'S ACTIVITIES")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(WH.Color.textSecondary)
+                .kerning(0.8)
+
+            VStack(spacing: 1) {
+                ForEach(todayWorkouts) { workout in
+                    Button {
+                        selectedWorkout = workout
+                    } label: {
+                        activityRow(workout)
+                    }
+                    .buttonStyle(.plain)
+
+                    if workout.id != todayWorkouts.last?.id {
+                        Divider().background(WH.Color.separator)
+                    }
+                }
+            }
+            .background(WH.Color.surface,
+                        in: RoundedRectangle(cornerRadius: WH.Radius.card, style: .continuous))
+        }
+    }
+
+    private func activityRow(_ w: Workout) -> some View {
+        let type = WorkoutType(kind: w.kind)
+        let accentColor = type?.color ?? WH.Color.strainBlue
+
+        return HStack(spacing: WH.Spacing.sm) {
+            // Strain badge with activity color
+            ZStack {
+                RoundedRectangle(cornerRadius: WH.Radius.small, style: .continuous)
+                    .fill(accentColor)
+                    .frame(width: 60, height: 40)
+                HStack(spacing: 4) {
+                    if let type {
+                        Image(systemName: type.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Text(w.strain.map { String(format: "%.1f", $0) } ?? "—")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .monospacedDigit()
+                }
+            }
+
+            // Activity name + time range
+            VStack(alignment: .leading, spacing: 2) {
+                Text(type?.displayName.uppercased() ?? "WORKOUT")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(WH.Color.textPrimary)
+                Text(timeRange(start: w.startTs, end: w.endTs))
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(WH.Color.textSecondary)
+            }
+
+            Spacer()
+
+            // Avg HR + chevron
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.0f", w.avgHr))
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(WH.Color.textPrimary)
+                    .monospacedDigit()
+                Text("avg bpm")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(WH.Color.textSecondary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(WH.Color.textSecondary.opacity(0.4))
+        }
+        .padding(.horizontal, WH.Spacing.md)
+        .padding(.vertical, WH.Spacing.sm)
+    }
+
+    private func timeRange(start: Int, end: Int) -> String {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .none
+        fmt.timeStyle = .short
+        let s = fmt.string(from: Date(timeIntervalSince1970: TimeInterval(start)))
+        let e = fmt.string(from: Date(timeIntervalSince1970: TimeInterval(end)))
+        return "\(s) – \(e)"
     }
 
     // MARK: - Sleep card
