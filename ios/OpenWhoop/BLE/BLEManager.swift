@@ -602,9 +602,12 @@ public final class BLEManager: NSObject, ObservableObject {
     ///
     /// Haptic firing cannot be verified in the simulator (no strap motor). Test on-device only.
     func testAlarmBuzz() {
-        send(.runHapticsPattern, payload: [pendingAlarmPatternId, pendingAlarmLoops, 0, 0, 0])
+        // Explicit waveform form from APK mh0/b.java — stronger than preset id=2.
+        // [wfe1=47, wfe2=152, 0,0,0,0,0,0, loop u16 LE=0,0, overall_loop=7, dur=30]
+        let waveform: [UInt8] = [47, 152, 0, 0, 0, 0, 0, 0, 0, 0, 7, 30]
+        send(.runHapticsPattern, payload: waveform)
         send(.runAlarm, payload: [0x01])
-        log("Alarm: test buzz fired (patternId=\(pendingAlarmPatternId), loops=\(pendingAlarmLoops), runAlarm)")
+        log("Alarm: test buzz fired (explicit waveform, overall_loop=7)")
     }
 
     /// Parse a standard BLE Heart Rate Measurement (0x2A37) via the pure StandardHeartRate parser.
