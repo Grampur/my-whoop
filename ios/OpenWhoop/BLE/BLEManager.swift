@@ -103,6 +103,8 @@ public final class BLEManager: NSObject, ObservableObject {
     /// Captured (device↔wall) correlation from GET_CLOCK; nil until the response lands.
     private(set) var clockRef: ClockRef?
 
+    private var realtimeHRStarted = false
+
     public init(state: LiveState, deviceId: String = "my-whoop") {
         self.state = state
         self.deviceId = deviceId
@@ -360,6 +362,11 @@ public final class BLEManager: NSObject, ObservableObject {
         backfillTimeout = nil
         backfillFrameQueue.removeAll()
         log("Backfill: session ended — reason=\(reason)")
+        if !realtimeHRStarted {
+            realtimeHRStarted = true
+            send(.toggleRealtimeHR, payload: [0x01])
+            log("Live HR stream started (TOGGLE_REALTIME_HR=1)")
+        }
         uploadOpportunistically()
         // Read-path sync runs AFTER the offload, never concurrently with it — the offload and the
         // pull share the WhoopStore actor, and a large first-run pull would starve the Backfiller's
@@ -667,6 +674,7 @@ extension BLEManager: CBCentralManagerDelegate {
         didBond = false
         clockRequested = false
         realtimeClockAnchored = false
+        realtimeHRStarted = false
         connectHandshakeDone = false
         // Reset backfill state so the next connect starts a fresh offload.
         backfillStarted = false
@@ -848,10 +856,12 @@ extension BLEManager: CBPeripheralDelegate {
         // Deferred 2s — after the backfill handshake settles — so it doesn't compete with
         // SEND_HISTORICAL on the BLE link. extractStreams reads type-40 exclusively for live HR
         // (type-43 raw flood is stopped above; 0x2A37 standard HR is display-only, not stored).
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.send(.toggleRealtimeHR, payload: [0x01])
-            self?.log("Live HR stream started (TOGGLE_REALTIME_HR=1)")
-        }
+
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        //     self?.send(.toggleRealtimeHR, payload: [0x01])
+        //     self?.log("Live HR stream started (TOGGLE_REALTIME_HR=1)")
+        // }
+
         uploadOpportunistically()
         // NOTE: the server pull + cloud-restore are deliberately NOT kicked here. They share the
         // WhoopStore actor with the historical offload, and a large first-run pull would starve the
