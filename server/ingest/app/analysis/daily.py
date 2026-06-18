@@ -426,28 +426,7 @@ def compute_day(conn, device_id: str, day: _dt.date) -> dict[str, Any]:
     night_start = min((s.start for s in night_sessions), default=None)
     night_end = max((s.end for s in night_sessions), default=None)
     avg_hrv = sleep_summary["avg_hrv"]
-    if night_sessions:
-        merged_stages: list[_sleep.StageSegment] = []
-        for s in night_sessions:
-            merged_stages.extend(s.stages)
-        merged_stages.sort(key=lambda seg: seg.start)
-        # resting_hr/avg_hrv intentionally omitted: nightly_hrv only uses start/end/stages.
-        merged_night = _sleep.SleepSession(
-            start=night_start, end=night_end, efficiency=sleep_summary["efficiency"],
-            stages=merged_stages)
-        hrv_res = _hrv.nightly_hrv(
-            streams.get("rr") or [], merged_night,
-            stages=merged_stages or None)
-        nightly_rmssd = hrv_res.get("rmssd")
-        if nightly_rmssd is not None and math.isfinite(nightly_rmssd):
-            # Sanity check: only accept nightly_hrv if it's within 40% of the
-            # sleep session value. Large divergence = artifact-corrupted RR data;
-            # fall back to the sleep session value in that case.
-            session_hrv = sleep_summary["avg_hrv"]
-            if session_hrv is None or abs(nightly_rmssd - session_hrv) / max(session_hrv, 1.0) <= 0.40:
-                avg_hrv = nightly_rmssd
-            else:
-                avg_hrv = session_hrv  # fall back to sleep session value
+
 
     # ── Recovery (needs the night's resp, sleep_perf, + a personal baseline) ──
     night_resp = None

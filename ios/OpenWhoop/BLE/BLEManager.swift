@@ -538,6 +538,10 @@ public final class BLEManager: NSObject, ObservableObject {
     func armStrapAlarm(at date: Date, patternId: UInt8 = 2, loops: UInt8 = 3,
                        onConfirmed: ((Date) -> Void)? = nil) {
         guard !backfilling else {
+            guard deferredAlarm == nil else {
+                log("Alarm: backfill in progress — deferring until offload completes")
+                return
+            }
             log("Alarm: backfill in progress — deferring until offload completes")
             deferredAlarm = { [weak self] in
                 self?.armStrapAlarm(at: date, patternId: patternId, loops: loops, onConfirmed: onConfirmed)
