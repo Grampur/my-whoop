@@ -920,30 +920,10 @@ extension BLEManager: CBPeripheralDelegate {
                    let newest = BLEManager.dataRangeNewestUnix(from: frame) {
                     strapNewestTs = newest                        // feeds the liveness watchdog
                 }
-                if frame.count > 6, frame[4] == WhoopCommand.commandType,
-                    frame[6] == WhoopCommand.getAlarmTime.rawValue {
-                        let hex = frame.map { String(format: "%02x", $0) }.joined(separator: " ")
-                        log("Alarm ACK raw: \(hex)")
-                        if frame.count >= 12 {
-                            let epoch = UInt32(frame[8]) | UInt32(frame[9]) << 8 | UInt32(frame[10]) << 16 | UInt32(frame[11]) << 24
-                        if epoch < 1_000_000_000 {
-                            log("Alarm ACK: strap reports no alarm armed")
-                        } else {
-                            let date = Date(timeIntervalSince1970: TimeInterval(epoch))
-                            let fmt = DateFormatter()
-                            fmt.dateStyle = .short; fmt.timeStyle = .short
-                            fmt.timeZone = TimeZone.current
-                            let hoursUntil = date.timeIntervalSinceNow / 3600
-                            if hoursUntil < 0 || hoursUntil > 24 {
-                                log("Alarm ACK: strap returned suspicious time \(fmt.string(from: date)) — ignoring")
-                            } else {
-                                log("Alarm ACK: strap confirmed \(fmt.string(from: date))")
-                                let cb = pendingAlarmOnConfirmed
-                                pendingAlarmOnConfirmed = nil
-                                cb?(date)
-                            }
-                        }
-                    }
+                if frame.count > 6, frame[6] == WhoopCommand.getAlarmTime.rawValue {
+                    let hex = frame.map { String(format: "%02x", $0) }.joined(separator: " ")
+                    log("Alarm ACK raw: \(hex)")
+                    // parse after we see what frame[4] actually is
                 }
                 // Clock correlation runs in both live and backfill modes. Once established it
                 // unblocks both the Collector (live path) and the Backfiller (chunk decoding).
