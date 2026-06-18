@@ -553,6 +553,7 @@ public final class BLEManager: NSObject, ObservableObject {
         pendingAlarmPatternId = patternId
         pendingAlarmLoops     = loops
         pendingAlarmOnConfirmed = onConfirmed
+        pendingAlarmDate = date
         send(.disableAlarm, payload: [0x01])
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self else { return }
@@ -577,6 +578,7 @@ public final class BLEManager: NSObject, ObservableObject {
     private var pendingAlarmPatternId: UInt8 = 2
     private var pendingAlarmLoops: UInt8 = 3
     private var pendingAlarmOnConfirmed: ((Date) -> Void)?
+    private var pendingAlarmDate: Date?
     private var deferredAlarm: (() -> Void)?
 
 
@@ -920,11 +922,16 @@ extension BLEManager: CBPeripheralDelegate {
                    let newest = BLEManager.dataRangeNewestUnix(from: frame) {
                     strapNewestTs = newest                        // feeds the liveness watchdog
                 }
-                if frame.count > 6, frame[6] == WhoopCommand.getAlarmTime.rawValue {
-                    let hex = frame.map { String(format: "%02x", $0) }.joined(separator: " ")
-                    log("Alarm ACK raw: \(hex)")
-                    // parse after we see what frame[4] actually is
-                }
+                if frame.count > 9, frame[4] == 36,
+                    frame[6] == WhoopCommand.getAlarmTime.rawValue,
+                    frame[8] == 0x01,
+                    let confirmedDate = pendingAlarmDate {
+                        log("Alarm ACK: strap confirmed alarm armed for \(confirmedDate)")
+                        let cb = pendingAlarmOnConfirmed
+                        pendingAlarmOnConfirmed = nil
+                        pendingAlarmDate = nil
+                        cb?(confirmedDate)
+                    }
                 // Clock correlation runs in both live and backfill modes. Once established it
                 // unblocks both the Collector (live path) and the Backfiller (chunk decoding).
                 if clockRef == nil {
