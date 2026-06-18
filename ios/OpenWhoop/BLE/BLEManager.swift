@@ -920,9 +920,12 @@ extension BLEManager: CBPeripheralDelegate {
                    let newest = BLEManager.dataRangeNewestUnix(from: frame) {
                     strapNewestTs = newest                        // feeds the liveness watchdog
                 }
-                if frame.count > 6, frame[6] == WhoopCommand.getAlarmTime.rawValue {
-                    if frame.count >= 11 {
-                        let epoch = UInt32(frame[7]) | UInt32(frame[8]) << 8 | UInt32(frame[9]) << 16 | UInt32(frame[10]) << 24
+                if frame.count > 6, frame[4] == WhoopCommand.commandType,
+                    frame[6] == WhoopCommand.getAlarmTime.rawValue {
+                        let hex = frame.map { String(format: "%02x", $0) }.joined(separator: " ")
+                        log("Alarm ACK raw: \(hex)")
+                        if frame.count >= 12 {
+                            let epoch = UInt32(frame[8]) | UInt32(frame[9]) << 8 | UInt32(frame[10]) << 16 | UInt32(frame[11]) << 24
                         if epoch < 1_000_000_000 {
                             log("Alarm ACK: strap reports no alarm armed")
                         } else {
