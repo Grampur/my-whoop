@@ -605,13 +605,12 @@ public final class BLEManager: NSObject, ObservableObject {
     /// — note for future refinement; the preset id=2 form is simpler and confirmed to buzz on-device.
     ///
     /// Haptic firing cannot be verified in the simulator (no strap motor). Test on-device only.
-    func testAlarmBuzz() {
-        // Explicit waveform form from APK mh0/b.java — stronger than preset id=2.
-        // [wfe1=47, wfe2=152, 0,0,0,0,0,0, loop u16 LE=0,0, overall_loop=7, dur=30]
-        let waveform: [UInt8] = [47, 152, 0, 0, 0, 0, 0, 0, 0, 0, 7, 30]
+    func testAlarmBuzz(loops: UInt8 = 7) {
+        let overallLoop = max(1, loops)
+        let waveform: [UInt8] = [47, 152, 0, 0, 0, 0, 0, 0, 0, 0, overallLoop, 30]
         send(.runHapticsPattern, payload: waveform)
         send(.runAlarm, payload: [0x01])
-        log("Alarm: test buzz fired (explicit waveform, overall_loop=7)")
+        log("Alarm: test buzz fired (explicit waveform, overall_loop=\(overallLoop))")
     }
 
     /// Parse a standard BLE Heart Rate Measurement (0x2A37) via the pure StandardHeartRate parser.

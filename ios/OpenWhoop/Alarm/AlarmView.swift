@@ -114,8 +114,22 @@ struct AlarmView: View {
             Stepper("Loops: \(loopCount)", value: $loopCount, in: 1...10)
                 .foregroundStyle(WH.Color.textPrimary)
                 .listRowBackground(WH.Color.surface)
+
+            Button {
+                live.runHaptic(pattern: UInt8(patternId), loops: UInt8(loopCount))
+            } label: {
+                Label("Test this pattern", systemImage: "waveform")
+            }
+            .foregroundStyle(WH.Color.strainBlue)
+            .listRowBackground(WH.Color.surface)
         } header: {
             sectionHeader("Alarm Haptic")
+        } footer: {
+            Text("Pattern/Loops only affect this test button and the Device tab's Test Alarm "
+                + "Buzz. The strap's own scheduled wake-up alarm fires from firmware with a "
+                + "fixed haptic and does not read this setting.")
+                .font(WH.Font.caption)
+                .foregroundStyle(WH.Color.textSecondary)
         }
     }
 

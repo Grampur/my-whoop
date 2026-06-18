@@ -66,7 +66,7 @@ public final class LiveViewModel: ObservableObject {
     /// Fire an immediate alarm-pattern buzz on the strap for testing (M6).
     /// Uses runHapticsPattern(patternId=2, loops=3) + runAlarm — same as the official WHOOP app.
     /// Cannot be verified in the simulator (no strap motor); test on-device only.
-    public func testAlarmBuzz() { ble.testAlarmBuzz() }
+    public func testAlarmBuzz() { ble.testAlarmBuzz(loops: UInt8(loopCount)) }
 
     /// On-demand bounded raw-accel capture (type-43 IMU) for `seconds`, then auto-stop + upload.
     /// Works even when the research toggle is off — that's the point: a one-off activity sample.

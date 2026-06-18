@@ -102,7 +102,7 @@ public enum WhoopCommand: UInt8, CaseIterable {
          UInt8((epochSec >> 8) & 0xFF),
          UInt8((epochSec >> 16) & 0xFF),
          UInt8((epochSec >> 24) & 0xFF),
-         0x00, 0x00, 0x00, 0x00]
+         0x00, 0x00]
     }
 
     /// COMMAND packet type byte (PacketType.COMMAND).
