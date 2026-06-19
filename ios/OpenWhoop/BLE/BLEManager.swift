@@ -148,8 +148,11 @@ public final class BLEManager: NSObject, ObservableObject {
             backfiller?.clockRef = ref
         }
         if let cfg = AppConfig.uploaderConfig(deviceId: deviceId) {
+            log("Uploader configured: baseURL=\(cfg.baseURL)")
             uploader = Uploader(config: cfg, store: store, deviceId: deviceId)
             serverSync = ServerSync(config: cfg, store: store, deviceId: deviceId)
+        } else {
+            log("Uploader NOT configured — check Secrets.xcconfig WHOOP_BASE_URL/WHOOP_API_KEY")
         }
     }
 

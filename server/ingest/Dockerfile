@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir /app/whoop-protocol
 COPY db /app/db
 COPY ingest/app /app/app
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--ssl-certfile", "/certs/gagans-macbook-air.tail69820b.ts.net.crt", "--ssl-keyfile", "/certs/gagans-macbook-air.tail69820b.ts.net.key"]

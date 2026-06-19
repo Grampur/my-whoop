@@ -39,5 +39,6 @@ services:
       - TZ=${TZ:-UTC}
     volumes:
       - ${DATA_ROOT}/whoop/raw:/data/raw
+      - ${TS_CERT_DIR}:/certs:ro 
     ports:
       - "${WHOOP_INGEST_PORT:-8770}:8000"
